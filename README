@@ -1,1 +1,6 @@
 time-recurrence is a Haskell library for working with recurring date/times.
+
+The iCalendar Specifcation (RFC 5545) is used for inspiration of this
+library, however the library does not make an effort to track the RFC
+at all times. A future Data.Time.Recurrence.RFC5545 library would be
+a useful add-on for those in need of strict RFC compliance.
