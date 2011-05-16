@@ -27,6 +27,8 @@ module Data.Time.Recurrence
 
 
 import Data.Time
+import Data.Time.Calendar.MonthDay (monthLength)
+import Data.Time.Calendar.OrdinalDate (mondayStartWeek, toOrdinalDate)
 
 
 -- | The base frequency of a Recurrence.
@@ -131,6 +133,39 @@ data Recurrence = R
 
 instance Eq Recurrence where
   x == y = (pointInTime x) == (pointInTime y)
+
+
+-- | Moment data type
+--
+-- Refinements work on a Moment, which is a UTCTime broken out into fields
+data Moment =
+    { year        :: Integer     -- ^ YYYY-January-dd
+    , month       :: Month       -- 
+    , day         :: Int         -- 
+    , hour        :: Int         -- ^ HH:MM:SS
+    , minute      :: Int         -- 
+    , second      :: Int         -- 
+    , week        :: Int         --
+    , weekDay     :: WeekDay     --
+    , yearDay     :: Int         --
+    , daysInMonth :: Int         --
+    , leapYear    :: Bool        --
+    , timeZone    :: TimeZone    --
+    }
+  deriving (Show)
+
+
+-- | moment conversions
+moment :: a -> Moment
+moment (R time _ _ _ _ _) = moment time
+moment (UTCTime d t) = Moment year (toEnum month) day hour minute (fromEnum second) week (toEnum weekDay) yearDay daysInMonth leapYear utc
+  where
+    (year, month, day) = toGregorian d
+    (TimeOfDay hour minute second) = timeToTimeOfDay t
+    (week, weekDay) = mondayStartWeek d
+    yearDay = snd $ toOrdinalDate d
+    leapYear = isLeapYear year
+    daysInMonth = monthLength leapYear month
 
 
 -- | UTCTime zero
