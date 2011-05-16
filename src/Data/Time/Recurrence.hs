@@ -1,5 +1,24 @@
 module Data.Time.Recurrence
     (
+      -- ^ Data Types
+      WeekDay (..)
+    , Month (..)
+
+      -- ^ Default Constructors
+    , secondly
+    , minutely
+    , hourly
+    , daily
+    , weekly
+    , monthly
+    , yearly
+    , secondlyWith
+    , minutelyWith
+    , hourlyWith
+    , dailyWith
+    , weeklyWith
+    , monthlyWith
+    , yearlyWith
     )
   where
 
