@@ -19,8 +19,14 @@ module Data.Time.Recurrence
     , weeklyWith
     , monthlyWith
     , yearlyWith
+
+      -- ^ API
+    , next
     )
   where
+
+
+import Data.Time
 
 
 -- | The base frequency of a Recurrence.
@@ -55,7 +61,7 @@ data WeekDay =
 -- | Symbolic months.
 --
 -- TODO: Move this to a more general library
-data Month
+data Month =
       January
     | February
     | March
@@ -138,7 +144,6 @@ mkR frequency refinement = R utcEpoch Monday frequency 1 False refinement
 -- | Base 'Recurrence' constructors. One for each of the Frequency types.
 --   Two versions are provided, one that defaults to no refinement and one
 --   that requires a refinement be specified.
-
 secondlyWith = R Secondly
 secondly = secondlyWith Nothing
 
@@ -161,3 +166,45 @@ yearlyWith = R Yearly
 yearly = yearlyWith Nothing
 
 
+-- useful time constants
+oneSecond = 1
+oneMinute = 60 * oneSecond
+oneHour   = 60 * oneMinute
+oneDay    = 24 * oneHour
+oneWeek   = 7  * oneDay
+
+
+-- UTCTime addition
+addTime :: Integer -> UTCTime -> UTCTime
+addTime i = addUTCTime (fromIntegral i)
+
+addDays :: (Integer -> Day -> Day) -> Integer -> UTCTime -> UTCTime
+addDays f i (UTCTime d t) = UTCTime (f i d) t
+
+addMonthsClip = addDays addGregorianMonthsClip
+addMonthsRollOver = addDays addGregorianMonthsRollOver
+
+addYearsClip = addDays addGregorianYearsClip
+addYearsRollOver = addDays addGregorianYearsRollOver
+
+
+-- | Recurrence addition
+scalePointInTime :: (Integer -> UTCTime -> UTCTime) -> Integer -> Recurrence -> Recurrence
+scalePointInTime f m r@(R t _ _ i _ _) = r { pointInTime = (f (i * m) t) }
+
+
+-- | Forward and backward drivers.
+next :: Recurrence -> Recurrence
+next r@(R _ Secondly _ _ _ Nothing) = scalePointInTime addTime oneSecond r
+next r@(R _ Minutely _ _ _ Nothing) = scalePointInTime addTime oneMinute r
+next r@(R _ Hourly   _ _ _ Nothing) = scalePointInTime addTime oneHour   r
+next r@(R _ Daily    _ _ _ Nothing) = scalePointInTime addTime oneDay    r
+next r@(R _ Weekly   _ _ _ Nothing) = scalePointInTime addTime oneWeek   r
+next r@(R _ Monthly  _ _ r Nothing) =
+  case r of
+    True  -> scalePointInTime addMonthsRollOver 1 r
+    False -> scalePointInTime addMonthsClip     1 r
+next r@(R _ Yearly   _ _ r Nothing) =
+  case r of
+    True  -> scalePointInTime addYearsRollOver 1 r
+    False -> scalePointInTime addYearsClip     1 r
