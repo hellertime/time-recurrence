@@ -106,3 +106,39 @@ data Recurrence = R
 
 instance Eq Recurrence where
   x == y = (pointInTime x) == (pointInTime y)
+
+
+-- | UTCTime zero
+utcEpoch = UTCTime (toEnum 0) 0
+
+
+-- Default constructor. Use a more refined constructor instead
+mkR frequency refinement = R utcEpoch Monday frequency 1 False refinement
+
+
+-- | Base 'Recurrence' constructors. One for each of the Frequency types.
+--   Two versions are provided, one that defaults to no refinement and one
+--   that requires a refinement be specified.
+
+secondlyWith = R Secondly
+secondly = secondlyWith Nothing
+
+minutelyWith = R Minutely
+minutely = minutelyWith Nothing
+
+hourlyWith = R Hourly
+hourly = hourlyWith Nothing
+
+dailyWith = R Daily
+daily = dailyWith Nothing
+
+weeklyWith = R Weekly
+weekly = weeklyWith Nothing
+
+monthlyWith = R Monthly
+monthly = monthlyWith Nothing
+
+yearlyWith = R Yearly
+yearly = yearlyWith Nothing
+
+
