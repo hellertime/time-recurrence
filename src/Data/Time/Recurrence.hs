@@ -12,29 +12,29 @@ module Data.Time.Recurrence
     , weekly
     , monthly
     , yearly
-    , secondlyWith
-    , minutelyWith
-    , hourlyWith
-    , dailyWith
-    , weeklyWith
-    , monthlyWith
-    , yearlyWith
 
       -- ^ API
-    , next
+    , recur
+    , withRules
+    , byMonth
+    , byWeekNumber
+    , byYearDay
     )
   where
 
 
+import Data.List.Ordered (nub, nubSort)
+import Data.Ord (comparing)
 import Data.Time
 import Data.Time.Calendar.MonthDay (monthLength)
-import Data.Time.Calendar.OrdinalDate (mondayStartWeek, toOrdinalDate)
+import Data.Time.Calendar.OrdinalDate (fromOrdinalDate, toOrdinalDate)
+import Data.Time.Calendar.WeekDate (toWeekDate, fromWeekDate)
 
 
 -- | The base frequency of a Recurrence.
 --
 -- The frequencies are chosen fromRFC 5545.
-data Frequencey =
+data Frequency =
       Secondly    -- ^ every second
     | Minutely    -- ^ every minute
     | Hourly      -- ^ every hour
@@ -108,37 +108,35 @@ instance Enum Month where
   toEnum unmatched = error ("Month.toEnum: Cannot match " ++ show unmatched)
 
 
-type Refinement = (Eq a) => Maybe ((Moment -> a) -> [a] -> Recurrence -> Maybe Recurrence)
-
 -- | Recurrence data type
 --
 -- This encapulates a point-in-time of a recurring series
 -- from here we can compute the 'next' and 'prev' Recurrence
 data Recurrence = R
-    { pointInTime  :: UTCTime    -- ^ the current moment
-    , startOfWeek  :: WeekDay    -- ^ used in calculations on a week
-                                 --   TODO: compute accurately when this
-                                 --         is another value than Monday
-                                 -- ^ (RFC 5545 defaults to Monday)
-    , frequency    :: Frequency  -- ^ defines the base frequency
-    , interval     :: Integer    -- ^ defines the step size 
-    , rollOver     :: Bool       -- ^ for values that would exceed the base
-                                 --   frequency, we clip them to the freq
-                                 --   unless this is True
-    , refinement   :: Refinement -- ^ A possible function which will modify
-                                 --   the recurrence pattern from the default
-                                 --   frequency
+    { frequency    :: Frequency    -- ^ defines the base frequency
+    , pointInTime  :: UTCTime      -- ^ the current moment
+    , startOfWeek  :: WeekDay      -- ^ used in calculations on a week
+                                   --   TODO: compute accurately when this
+                                   --         is another value than Monday
+                                   -- ^ (RFC 5545 defaults to Monday)
+    , interval     :: Integer      -- ^ defines the step size 
+    , rollOver     :: Bool         -- ^ for values that would exceed the base
+                                   --   frequency, we clip them to the freq
+                                   --   unless this is True
     }
   deriving (Show)
 
 instance Eq Recurrence where
-  x == y = (pointInTime x) == (pointInTime y)
+  x == y = pointInTime x == pointInTime y
+
+instance Ord Recurrence where
+  x `compare` y = comparing pointInTime x y
 
 
 -- | Moment data type
 --
 -- Refinements work on a Moment, which is a UTCTime broken out into fields
-data Moment =
+data Moment = M
     { year        :: Integer     -- ^ YYYY-January-dd
     , month       :: Month       -- 
     , day         :: Int         -- 
@@ -156,49 +154,39 @@ data Moment =
 
 
 -- | moment conversions
-moment :: a -> Moment
-moment (R time _ _ _ _ _) = moment time
-moment (UTCTime d t) = Moment year (toEnum month) day hour minute (fromEnum second) week (toEnum weekDay) yearDay daysInMonth leapYear utc
+moment :: UTCTime -> Moment
+moment (UTCTime d t) = M year (toEnum month) day hour minute (fromEnum second) week (toEnum weekDay) yearDay daysInMonth leapYear utc
   where
     (year, month, day) = toGregorian d
     (TimeOfDay hour minute second) = timeToTimeOfDay t
-    (week, weekDay) = mondayStartWeek d
+    (_, week, weekDay) = toWeekDate d
     yearDay = snd $ toOrdinalDate d
     leapYear = isLeapYear year
     daysInMonth = monthLength leapYear month
 
+
+momentToUTCTime :: Moment -> UTCTime
+momentToUTCTime m = UTCTime d t
+  where
+    d = fromGregorian (year m) (fromEnum $ month m) (day m)
+    t = timeOfDayToTime $ TimeOfDay (hour m) (minute m) (toEnum $ second m)
 
 -- | UTCTime zero
 utcEpoch = UTCTime (toEnum 0) 0
 
 
 -- Default constructor. Use a more refined constructor instead
-mkR frequency refinement = R utcEpoch Monday frequency 1 False refinement
+mkR frequency = R frequency utcEpoch Monday 1 False
 
 
 -- | Base 'Recurrence' constructors. One for each of the Frequency types.
---   Two versions are provided, one that defaults to no refinement and one
---   that requires a refinement be specified.
-secondlyWith = R Secondly
-secondly = secondlyWith Nothing
-
-minutelyWith = R Minutely
-minutely = minutelyWith Nothing
-
-hourlyWith = R Hourly
-hourly = hourlyWith Nothing
-
-dailyWith = R Daily
-daily = dailyWith Nothing
-
-weeklyWith = R Weekly
-weekly = weeklyWith Nothing
-
-monthlyWith = R Monthly
-monthly = monthlyWith Nothing
-
-yearlyWith = R Yearly
-yearly = yearlyWith Nothing
+secondly = mkR Secondly
+minutely = mkR Minutely
+hourly = mkR Hourly
+daily = mkR Daily
+weekly = mkR Weekly
+monthly = mkR Monthly
+yearly = mkR Yearly
 
 
 -- useful time constants
@@ -213,33 +201,85 @@ oneWeek   = 7  * oneDay
 addTime :: Integer -> UTCTime -> UTCTime
 addTime i = addUTCTime (fromIntegral i)
 
-addDays :: (Integer -> Day -> Day) -> Integer -> UTCTime -> UTCTime
-addDays f i (UTCTime d t) = UTCTime (f i d) t
+addUTCDays :: (Integer -> Day -> Day) -> Integer -> UTCTime -> UTCTime
+addUTCDays f i (UTCTime d t) = UTCTime (f i d) t
 
-addMonthsClip = addDays addGregorianMonthsClip
-addMonthsRollOver = addDays addGregorianMonthsRollOver
+addMonthsClip = addUTCDays addGregorianMonthsClip
+addMonthsRollOver = addUTCDays addGregorianMonthsRollOver
 
-addYearsClip = addDays addGregorianYearsClip
-addYearsRollOver = addDays addGregorianYearsRollOver
+addMonths b = if b then addMonthsRollOver else addMonthsClip
+
+addYearsClip = addUTCDays addGregorianYearsClip
+addYearsRollOver = addUTCDays addGregorianYearsRollOver
+
+addYears b = if b then addYearsRollOver else addYearsClip
 
 
 -- | Recurrence addition
 scalePointInTime :: (Integer -> UTCTime -> UTCTime) -> Integer -> Recurrence -> Recurrence
-scalePointInTime f m r@(R t _ _ i _ _) = r { pointInTime = (f (i * m) t) }
+scalePointInTime f m r@(R _ t _ i _) = r {pointInTime = f (i * m) t}
 
 
 -- | Forward and backward drivers.
 next :: Recurrence -> Recurrence
-next r@(R _ Secondly _ _ _ Nothing) = scalePointInTime addTime oneSecond r
-next r@(R _ Minutely _ _ _ Nothing) = scalePointInTime addTime oneMinute r
-next r@(R _ Hourly   _ _ _ Nothing) = scalePointInTime addTime oneHour   r
-next r@(R _ Daily    _ _ _ Nothing) = scalePointInTime addTime oneDay    r
-next r@(R _ Weekly   _ _ _ Nothing) = scalePointInTime addTime oneWeek   r
-next r@(R _ Monthly  _ _ r Nothing) =
-  case r of
-    True  -> scalePointInTime addMonthsRollOver 1 r
-    False -> scalePointInTime addMonthsClip     1 r
-next r@(R _ Yearly   _ _ r Nothing) =
-  case r of
-    True  -> scalePointInTime addYearsRollOver 1 r
-    False -> scalePointInTime addYearsClip     1 r
+next r@(R Secondly _ _ _ _) = scalePointInTime addTime oneSecond r
+next r@(R Minutely _ _ _ _) = scalePointInTime addTime oneMinute r
+next r@(R Hourly   _ _ _ _) = scalePointInTime addTime oneHour   r
+next r@(R Daily    _ _ _ _) = scalePointInTime addTime oneDay    r
+next r@(R Weekly   _ _ _ _) = scalePointInTime addTime oneWeek   r
+next r@(R Monthly  _ _ _ roll) = scalePointInTime (addMonths roll) 1 r
+next r@(R Yearly   _ _ _ roll) = scalePointInTime (addYears roll) 1 r
+
+-- | Generate a infinite list of recurrences
+recur :: Recurrence -> [Recurrence]
+recur = iterate next
+
+
+-- | Takes a list of rule parts and apply them over a list of Recurrence
+--   to generate a new list of Recurrence
+withRules :: [Recurrence -> [Recurrence]] -> [Recurrence] -> [Recurrence]
+withRules rs = nub . mapply (map concatMap rs)
+  where
+    mapply fs xs = foldl (\xs f -> f xs) xs fs
+
+
+byMonth :: [Month] -> Recurrence -> [Recurrence]
+byMonth ms = go
+  where
+    go :: Recurrence -> [Recurrence]
+    go r@(R Yearly t _ _ _) = map (expand r $ moment t) $ nubSort ms
+    go r@(R _ t _ _ _) = [r | month (moment t) `elem` ms]
+    expand :: Recurrence -> Moment -> Month -> Recurrence
+    expand r mt m = r { pointInTime = momentToUTCTime $ mt { month = m } }
+
+byWeekNumber :: [Int] -> Recurrence -> [Recurrence]
+byWeekNumber wks = go
+  where
+    go :: Recurrence -> [Recurrence]
+    go r@(R Yearly t _ _ _) = map (expand r $ moment t) $ nubSort wks
+    go r = error ("Data.Time.Recurrence.byWeekNumber: Undefined on " ++ show r)
+    expand :: Recurrence -> Moment -> Int -> Recurrence
+    expand r mt wk = r {pointInTime = momentToUTCTime $ mt {year = y, month = toEnum m, day = d}}
+      where
+        (y, m, d) = toGregorian $ fromWeekDate (year mt) wk (day mt)
+
+byYearDay :: [Int] -> Recurrence -> [Recurrence]
+byYearDay dys = go
+  where
+    normDay :: Int -> Int
+    normDay d = if d < 0 then 367 + d else d
+    normDays = nubSort $ map normDay dys
+    go :: Recurrence -> [Recurrence]
+    go r@(R f t _ _ _) =
+      case f of
+        Yearly -> map (expand r $ moment t) normDays
+        Hourly   -> limit t r
+        Minutely -> limit t r
+        Secondly -> limit t r
+        _ -> error ("Data.Time.Recurrence.byYearDay: Undefined on " ++ show r)
+    limit :: UTCTime -> Recurrence -> [Recurrence]
+    limit t r = [r | yearDay (moment t) `elem` dys]
+    expand :: Recurrence -> Moment -> Int -> Recurrence
+    expand r mt dy = r {pointInTime = momentToUTCTime $ mt {year = y, month = toEnum m, day = d}}
+      where
+        (y, m, d) = toGregorian $ fromOrdinalDate (year mt) dy
