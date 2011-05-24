@@ -112,6 +112,13 @@ momentChangeYearDay m yd = do
   d' <- fromOrdinalDateValid (year tm) yd
   return $ m{moment = (UTCTime d' t)}
 
+momentChangeWeekDay :: Moment -> WeekDay -> Maybe Moment
+momentChangeWeekDay m d = do
+  let (UTCTime d t) = moment m
+  let (yr, wk, wd) = toWeekDate d
+  d' <- fromWeekDateValid yr wk $ (toEnum wd) + 1
+  return m{moment = (UTCTime d' t)}
+
 -- | @Time@ data type
 data Time = T
     { year       :: Integer
@@ -206,25 +213,6 @@ next interval = go
     go m@(Yearly _)   = scaleUTCTime addYearsRollOver interval m
     scale = scaleUTCTime addTime 
 
-{-
-bySetPosition :: [Int] -> Recurrence -> Recurrence
-bySetPosition = go
-  where
-    go :: [Int] -> Recurrence -> Recurrence
-    go [] r = r
-    go ns r = 
-      let ms = moments r 
-      in BySetPosition $ map (ms !!) (nubSort $ norm ns (length ms))
-    norm ns l     = foldl (f l) [] ns
-    f l acc 0 = acc
-    f l acc n =
-      case n > 0 of
-        True -> if n - 1 < l then (n-1):acc else acc
-        False -> 
-          let n' = l+n in
-            if n' > 0 && n' < l then (-n):acc else acc
--}
-
 -- | Normalize an bounded index
 normIndex :: Int -> Int -> Maybe Int
 normIndex max 0 = Nothing
@@ -272,8 +260,15 @@ byMonthDay days = go days'
     go days m@(Minutely _) = limit days day m
     go days m@(Hourly _)   = limit days day m
     go days m@(Daily _)    = limit days day m
-    go days m  = map (setDay m) days
+    go days m = map (setDay m) days
     setDay :: Moment -> Int -> Moment
     setDay m d = m{moment = timeToUTC (utcToTime $ moment m){day = d}}
 
 byDay :: [WeekDay] -> Moment -> [Moment]
+byDay days = go (nubSort days)
+  where
+    go days m@(Secondly _) = limit days weekDay m
+    go days m@(Minutely _) = limit days weekDay m
+    go days m@(Hourly _)   = limit days weekDay m
+    go days m@(Daily _)    = limit days weekDay m
+    go days m = mapMaybe (momentChangeWeekDay m) days
