@@ -213,6 +213,18 @@ next interval = go
     go m@(Yearly _)   = scaleUTCTime addYearsRollOver interval m
     scale = scaleUTCTime addTime 
 
+-- | Generate recurrences from the startDate, filtered by optional rules
+recurBy :: Integer -> Moment -> [Moment -> [Moment]] -> [Moment]
+recurBy interval startDate subRules = nub $ applySubRules $ recurFrom startDate
+  where
+    recurFrom = iterate $ next interval
+    fapply fs xs = foldl (\xs' f -> f xs') xs fs
+    applySubRules = fapply (map concatMap subRules)
+
+-- | Default interval of 1
+recur :: Moment -> [Moment -> [Moment]] -> [Moment]
+recur = recurBy 1
+
 -- | Normalize an bounded index
 normIndex :: Int -> Int -> Maybe Int
 normIndex max 0 = Nothing
@@ -254,7 +266,7 @@ byYearDay days = go days'
 byMonthDay :: [Int] -> Moment -> [Moment]
 byMonthDay days = go days'
   where
-    days' = nubSort $ mayMaybe (normIndex 31) days
+    days' = nubSort $ mapMaybe (normIndex 31) days
     go days m@(Weekly _) = [m]
     go days m@(Secondly _) = limit days day m
     go days m@(Minutely _) = limit days day m
