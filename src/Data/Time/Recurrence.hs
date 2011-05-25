@@ -93,17 +93,28 @@ instance Enum Month where
 
   toEnum unmatched = error ("Month.toEnum: Cannot match " ++ show unmatched)
 
--- | @Moment@ data type
---   One per Frequency (Is this the best way to define this?)
-data Moment
-    = Secondly { moment :: UTCTime }
-    | Minutely { moment :: UTCTime }
-    | Hourly   { moment :: UTCTime }
-    | Daily    { moment :: UTCTime }
-    | Weekly   { moment :: UTCTime }
-    | Monthly  { moment :: UTCTime }
-    | Yearly   { moment :: UTCTime }
-  deriving (Show, Eq, Ord)
+-- | @Frequency@ data type
+data Frequency
+    = Seconds
+    | Minutes
+    | Hours
+    | Days
+    | Weeks
+    | Months
+    | Years
+  deriving (Show)
+
+newtype Interval = Interval Integer
+newtype StartOfWeek = StartOfWeek WeekDay
+
+-- | @Moment@ type class
+class Moment a where
+  toDateTime   :: a -> DateTime
+  fromDateTime :: DateTime -> a
+  next         :: Interval -> Frequency -> StartOfWeek -> a -> a
+  prev         :: Interval -> Frequency -> StartOfWeek -> a -> a
+  scaleTime    :: a -> Integer -> a
+  scaleDays    :: (Integer -> Day -> Day) -> a -> Integer -> a
 
 -- | Test if (field t) is elem in xs
 momentElem :: Eq a => Moment -> (Time -> a) -> [a] -> Bool
