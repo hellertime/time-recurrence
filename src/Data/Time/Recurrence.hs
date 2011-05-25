@@ -141,13 +141,35 @@ oneWeek   = 7  * oneDay
 
 -- | @Moment@ type class
 class Moment a where
+  -- ^ Minimum Definition
   toDateTime      :: a -> DateTime
   fromDateTime    :: DateTime -> Maybe a
   scaleTime       :: a -> Integer -> a
-  scaleMonths     :: a -> Integer -> a
-  scaleYears      :: a -> Integer -> a
+  scaleMonth      :: a -> Integer -> a
+  scaleYear       :: a -> Integer -> a
+
   alterWeekNumber :: StartOfWeek -> a -> Int -> Maybe a
   alterYearDay    :: a -> Int -> Maybe a
+
+  -- ^ Other Methods
+
+  alterSecond     :: a -> Int -> Maybe a
+  alterSecond x s = fromDateTime (toDateTime x){dtSecond = s}
+
+  alterMinute     :: a -> Int -> Maybe a
+  alterMinute x m = fromDateTime (toDateTime x){dtMinute = m}
+
+  alterHour       :: a -> Int -> Maybe a
+  alterHour x h = fromDateTime (toDateTime x){dtHour = h}
+
+  alterDay        :: a -> Int -> Maybe a
+  alterDay x d = fromDateTime (toDateTime x){dtDay = d}
+
+  alterMonth      :: a -> Month -> Maybe a
+  alterMonth x m = fromDateTime (toDateTime x){dtMonth = m}
+
+  alterYear       :: a -> Integer -> Maybe a
+  alterYear x y = fromDateTime (toDateTime x){dtYear = y}
 
   next :: Interval -> Frequency -> a -> a
   next interval freq =
@@ -228,6 +250,10 @@ monthly = mkRP Months
 
 yearly :: RecurrenceParameter   -- ^ Recur every year
 yearly = mkRP Years
+
+-- | The @Recurrence@ type
+--   a @Recurrence@ is on or more @Moment@s
+newtype Moment a => Recurrence a = Recurrence [a]
 
 -- | Test if (field t) is elem in xs
 momentElem :: Eq a => Moment -> (Time -> a) -> [a] -> Bool
