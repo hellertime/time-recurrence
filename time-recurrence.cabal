@@ -57,7 +57,7 @@ source-repository head
 
 Library
   hs-source-dirs:      src
-  ghc-options:         -Wall
+  ghc-options:         -Wall -fno-warn-name-shadowing
 
   -- Modules exported by the library.
   Exposed-modules:     Data.Time.Recurrence

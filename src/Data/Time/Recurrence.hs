@@ -13,6 +13,10 @@ module Data.Time.Recurrence
     , recurBy
     , recur
 
+      -- * Create @UTCTime@
+    , utcGregorian
+    , utcGregorianWithTime
+
       -- * @Recurrence@ type rule effects
     , byMonth
     , byWeekNumber
@@ -24,7 +28,6 @@ module Data.Time.Recurrence
 
 import Data.List.Ordered (nub, nubSort)
 import Data.Maybe (mapMaybe, fromJust)
-import Data.Ord (comparing)
 import Data.Time
 import Data.Time.Calendar.MonthDay (monthLength)
 import Data.Time.Calendar.OrdinalDate (toOrdinalDate, fromOrdinalDateValid, fromMondayStartWeekValid, mondayStartWeek)
@@ -108,25 +111,17 @@ momentElem m field xs = field (utcToTime $ moment m) `elem` xs
 
 momentChangeWeekNumber :: Moment -> Int -> Maybe Moment
 momentChangeWeekNumber m w = do
-  let (UTCTime d t) = moment m
+  let (UTCTime _ t) = moment m
   let tm = utcToTime $ moment m
-  d' <- fromMondayStartWeekValid (year tm) w (fromEnum $ weekDay tm)
-  return $ m{moment = UTCTime d' t}
+  d <- fromMondayStartWeekValid (year tm) w (fromEnum $ weekDay tm)
+  return $ m{moment = UTCTime d t}
 
 momentChangeYearDay :: Moment -> Int -> Maybe Moment
 momentChangeYearDay m yd = do
-  let (UTCTime d t) = moment m
+  let (UTCTime _ t) = moment m
   let tm = utcToTime $ moment m
-  d' <- fromOrdinalDateValid (year tm) yd
-  return $ m{moment = UTCTime d' t}
-
-momentChangeWeekDay :: Moment -> WeekDay -> Maybe Moment
-momentChangeWeekDay m d = do
-  let (UTCTime d t) = moment m
-  let yr = fst $ toOrdinalDate d
-  let (wk, wd) = mondayStartWeek d
-  d' <- fromMondayStartWeekValid yr wk $ toEnum (wd + 1 `mod` 6)
-  return m{moment = UTCTime d' t}
+  d <- fromOrdinalDateValid (year tm) yd
+  return $ m{moment = UTCTime d t}
 
 -- | @Time@ data type
 data Time = T
@@ -194,23 +189,11 @@ addTime i = addUTCTime (fromIntegral i)
 addUTCDays :: (Integer -> Day -> Day) -> Integer -> UTCTime -> UTCTime
 addUTCDays f i (UTCTime d t) = UTCTime (f i d) t
 
-addMonthsClip :: Integer -> UTCTime -> UTCTime
-addMonthsClip = addUTCDays addGregorianMonthsClip
-
 addMonthsRollOver :: Integer -> UTCTime -> UTCTime
 addMonthsRollOver = addUTCDays addGregorianMonthsRollOver
 
-addMonths :: Bool -> Integer -> UTCTime -> UTCTime
-addMonths b = if b then addMonthsRollOver else addMonthsClip
-
-addYearsClip :: Integer -> UTCTime -> UTCTime
-addYearsClip = addUTCDays addGregorianYearsClip
-
 addYearsRollOver :: Integer -> UTCTime -> UTCTime
 addYearsRollOver = addUTCDays addGregorianYearsRollOver
-
-addYears :: Bool -> Integer -> UTCTime -> UTCTime
-addYears b = if b then addYearsRollOver else addYearsClip
 
 -- | Moment addition
 scaleUTCTime :: (Integer -> UTCTime -> UTCTime) -> Integer -> Moment -> Moment 
@@ -253,9 +236,9 @@ moments m@(Yearly u) =
     else map yearly $ take 365 $ recur [] startDate'
   where
     yearly = Yearly . moment 
-    startDate = fromJust (momentChangeYearDay m 1)
+    startDate = fromJust $ momentChangeYearDay m 1
     startDate' = Daily $ moment startDate
-moments m@(Monthly u) = map monthly $ take days $ recur [] startDate
+moments (Monthly u) = map monthly $ take days $ recur [] startDate
   where
     monthly = Monthly . moment
     tm = utcToTime u
@@ -267,16 +250,20 @@ moments m@(Weekly u) = map weekly $ take 7 $ recur [] $ Daily (moment m')
     tm = utcToTime u
     delta = fromEnum (weekDay tm) - fromEnum Monday
     m' = fromJust $ momentChangeYearDay m (yearDay tm - delta)
+moments m = [m]
 
 -- | Normalize an bounded index
+--   Pass an upper-bound 'ub' and an index 'idx'
+--   Converts 'idx' < 0 into valid 'idx' > 0 or
+--   Nothing
 normIndex :: Int -> Int -> Maybe Int
-normIndex max 0 = Nothing
-normIndex max idx =
-  if abs idx > max
+normIndex _ 0 = Nothing
+normIndex ub idx =
+  if abs idx > ub
     then Nothing
-    else Just $ (idx + max') `mod` max'
+    else Just $ (idx + ub') `mod` ub'
   where
-    max' = max + 1
+    ub' = ub + 1
 
 limit :: Eq a => [a] -> (Time -> a) -> Moment -> [Moment]
 limit xs f m = [m | momentElem m f xs]
@@ -292,7 +279,7 @@ byWeekNumber :: [Int] -> Moment -> [Moment]
 byWeekNumber weeks m@(Yearly _) = mapMaybe (momentChangeWeekNumber m) weeks'
   where
     weeks' = nubSort $ mapMaybe (normIndex 53) weeks
-byWeekNumber weeks m = [m]
+byWeekNumber _ m = [m]
 
 byYearDay :: [Int] -> Moment -> [Moment]
 byYearDay days = go days'
@@ -310,7 +297,7 @@ byMonthDay :: [Int] -> Moment -> [Moment]
 byMonthDay days = go days'
   where
     days' = nubSort $ mapMaybe (normIndex 31) days
-    go days m@(Weekly _) = [m]
+    go _ m@(Weekly _) = [m]
     go days m@(Secondly _) = limit days day m
     go days m@(Minutely _) = limit days day m
     go days m@(Hourly _)   = limit days day m
