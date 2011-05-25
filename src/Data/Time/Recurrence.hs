@@ -179,8 +179,8 @@ class Moment a where
       Hours   -> scale oneHour
       Days    -> scale oneDay
       Weeks   -> scale oneWeek
-      Months  -> flip scaleMonths interval
-      Years   -> flip scaleYears interval
+      Months  -> flip scaleMonth interval
+      Years   -> flip scaleYear interval
     where
       scale x = flip scaleTime (interval * x)
 
@@ -204,8 +204,8 @@ instance Moment UTCTime where
       return $ UTCTime day time
 
   scaleTime = flip addUTCTime . fromIntegral
-  scaleMonths (UTCTime d t) i = UTCTime (addGregorianMonthsRollOver i d) t
-  scaleYears (UTCTime d t) i = UTCTime (addGregorianYearsRollOver i d) t
+  scaleMonth (UTCTime d t) i = UTCTime (addGregorianMonthsRollOver i d) t
+  scaleYear (UTCTime d t) i = UTCTime (addGregorianYearsRollOver i d) t
 
   -- ^ TODO: Stop ignoring 'sow'
   alterWeekNumber sow utc@(UTCTime _ time) week = do
@@ -255,6 +255,9 @@ yearly = mkRP Years
 --   a @Recurrence@ is on or more @Moment@s
 newtype Moment a => Recurrence a = Recurrence [a]
 
+mkR :: Moment a => a -> Recurrence [a]
+mkR x = Recurrence [x]
+
 -- | Test if (field t) is elem in xs
 momentElem :: Eq a => Moment -> (Time -> a) -> [a] -> Bool
 momentElem m field xs = field (utcToTime $ moment m) `elem` xs
@@ -287,28 +290,24 @@ recur = recurBy 1
 --   Monthly all days in the month of that year
 --   Weekly all days in the week of that month of that year,
 --   starting on the first day of the week
-moments :: Moment -> [Moment]
-moments m@(Yearly u) = 
-  if isLeapYear (year $ utcToTime u)
-    then map yearly $ take 366 $ recur [] startDate'
-    else map yearly $ take 365 $ recur [] startDate'
+moments :: Moment a => Frequency -> a -> [a]
+moments Years x =
+  if isLeapYear $ dtYear $ toDateTime x
+    then take 366 $ recur [] $ daily startDate
+    else take 365 $ recur [] $ daily startDate
   where
-    yearly = Yearly . moment 
-    startDate = fromJust $ momentChangeYearDay m 1
-    startDate' = Daily $ moment startDate
-moments (Monthly u) = map monthly $ take days $ recur [] startDate
+    startDate = fromJust $ alterYearDay x 1
+moments Months x = take days $ recur [] $ daily startDate
   where
-    monthly = Monthly . moment
-    tm = utcToTime u
-    startDate = Daily $ timeToUTC tm{day = 1}
-    days = monthLength (isLeapYear (year tm)) (fromEnum $ month tm)
-moments m@(Weekly u) = map weekly $ take 7 $ recur [] $ Daily (moment m')
+    dt = toDateTime x
+    days = monthLength (isLeapYear (dtYear dt)) (fromEnum $ dtMonth dt)
+    startDate = fromJust $ alterDay x 1
+moments Weeks x = take 7 $ recur [] $ daily startDate
   where
-    weekly = Weekly . moment
-    tm = utcToTime u
-    delta = fromEnum (weekDay tm) - fromEnum Monday
-    m' = fromJust $ momentChangeYearDay m (yearDay tm - delta)
-moments m = [m]
+    dt = toDateTime x
+    delta = fromEnum (dtWeekDay dt) - fromEnum Monday
+    startDate = fromJust $ alterYearDay x $ dtYearDay dt - delta
+moments _ = mkR
 
 -- | Normalize an bounded index
 --   Pass an upper-bound 'ub' and an index 'idx'
@@ -326,50 +325,45 @@ normIndex ub idx =
 limit :: Eq a => [a] -> (Time -> a) -> Moment -> [Moment]
 limit xs f m = [m | momentElem m f xs]
 
-byMonth :: [Month] -> Moment -> [Moment]
-byMonth months m@(Yearly _) = map (setMonth m) months
-  where
-    setMonth :: Moment -> Month -> Moment
-    setMonth m mo = m{moment = timeToUTC (utcToTime $ moment m){month = mo}}
-byMonth months m = limit months month m
+byMonth :: Moment a => [Month] -> Frequency -> a -> Recurrence a
+byMonth months Years x = Recurrence $ mapMaybe (alterMonth x) months
+byMonth months _ x = Recurrence $ [x | dtMonth (toDateTime x) `elem` months]
 
-byWeekNumber :: [Int] -> Moment -> [Moment]
-byWeekNumber weeks m@(Yearly _) = mapMaybe (momentChangeWeekNumber m) weeks'
+byWeekNumber :: Moment a => [Int] -> Frequency -> a -> Recurrence a 
+byWeekNumber weeks Years x = Recurrence $ mapMaybe (alterWeekNumber x) weeks'
   where
     weeks' = nubSort $ mapMaybe (normIndex 53) weeks
-byWeekNumber _ m = [m]
+byWeekNumber _ _ = mkR
 
-byYearDay :: [Int] -> Moment -> [Moment]
-byYearDay days = go days'
+byYearDay :: Moment a => [Int] -> Frequency -> a -> Recurrence a
+byYearDay days freq = go freq days'
   where
     days' = nubSort $ mapMaybe (normIndex 366) days
-    go days m@(Secondly _) = limit days yearDay m
-    go days m@(Minutely _) = limit days yearDay m
-    go days m@(Hourly _)   = limit days yearDay m
-    go _ m@(Daily _)   = [m]
-    go _ m@(Weekly _)  = [m]
-    go _ m@(Monthly _) = [m]
-    go days m@(Yearly _) = mapMaybe (momentChangeYearDay m) days
+    go Seconds ds x = Recurrence $ [x | dtYearDay (toDateTime x) `elem` ds]
+    go Minutes ds x = Recurrence $ [x | dtYearDay (toDateTime x) `elem` ds]
+    go Hours   ds x = Recurrence $ [x | dtYearDay (toDateTime x) `elem` ds]
+    go Days    _ = mkR
+    go Weeks   _ = mkR
+    go Months  _ = mkR
+    go Years ds x = Recurrence $ mapMaybe (alterYearDay x) ds
 
-byMonthDay :: [Int] -> Moment -> [Moment]
-byMonthDay days = go days'
+byMonthDay :: Moment a => [Int] -> Frequency -> a -> Recurrence a
+byMonthDay days freq = go freq days'
   where
     days' = nubSort $ mapMaybe (normIndex 31) days
-    go _ m@(Weekly _) = [m]
-    go days m@(Secondly _) = limit days day m
-    go days m@(Minutely _) = limit days day m
-    go days m@(Hourly _)   = limit days day m
-    go days m@(Daily _)    = limit days day m
-    go days m = map (setDay m) days
-    setDay :: Moment -> Int -> Moment
-    setDay m d = m{moment = timeToUTC (utcToTime $ moment m){day = d}}
+    go Seconds ds x = Recurrence $ [x | dtDay (toDateTime x) `elem` ds]
+    go Minutes ds x = Recurrence $ [x | dtDay (toDateTime x) `elem` ds]
+    go Hours   ds x = Recurrence $ [x | dtDay (toDateTime x) `elem` ds]
+    go Days    ds x = Recurrence $ [x | dtDay (toDateTime x) `elem` ds]
+    go _       ds x = Recurrence $ mapMaybe (alterDay x) ds
 
-byDay :: [WeekDay] -> Moment -> [Moment]
-byDay days = go (nubSort days)
+byDay :: Moment a => [WeekDay] -> Frequency -> a -> Recurrence a
+byDay days freq = go freq days
   where
-    go days m@(Secondly _) = limit days weekDay m
-    go days m@(Minutely _) = limit days weekDay m
-    go days m@(Hourly _)   = limit days weekDay m
-    go days m@(Daily _)    = limit days weekDay m
-    go days m = filter (\x -> momentElem x weekDay days) $ moments m
-    
+   go Seconds ds x = Recurrence $ [x | dtWeekDay (toDateTime x) `elem` ds]
+   go Minutes ds x = Recurrence $ [x | dtWeekDay (toDateTime x) `elem` ds]
+   go Hours   ds x = Recurrence $ [x | dtWeekDay (toDateTime x) `elem` ds]
+   go Days    ds x = Recurrence $ [x | dtWeekDay (toDateTime x) `elem` ds]
+   go freq    ds x = filter (onDays ds) $ moments freq x
+     where
+       onDays ds x = dtWeekDay (toDateTime x) `elem` ds
