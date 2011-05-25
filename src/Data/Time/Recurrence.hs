@@ -9,17 +9,25 @@ module Data.Time.Recurrence
       -- * The @Moment@ type
     , Moment (..)
 
+      -- * Generate list of recurring @Moment@
+    , recurBy
+    , recur
+
       -- * @Recurrence@ type rule effects
     , byMonth
+    , byWeekNumber
+    , byYearDay
+    , byMonthDay
+    , byDay 
     )
   where
 
 import Data.List.Ordered (nub, nubSort)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromJust)
 import Data.Ord (comparing)
 import Data.Time
-import Data.Time.Calendar.OrdinalDate (fromOrdinalDate, toOrdinalDate, fromOrdinalDateValid)
-import Data.Time.Calendar.WeekDate (fromWeekDate, fromWeekDateValid, toWeekDate)
+import Data.Time.Calendar.MonthDay (monthLength)
+import Data.Time.Calendar.OrdinalDate (toOrdinalDate, fromOrdinalDateValid, fromMondayStartWeekValid, mondayStartWeek)
 
 -- | Symbolic week days.
 --
@@ -96,28 +104,29 @@ data Moment
 
 -- | Test if (field t) is elem in xs
 momentElem :: Eq a => Moment -> (Time -> a) -> [a] -> Bool
-momentElem m field xs = (field $ utcToTime $ moment m) `elem` xs
+momentElem m field xs = field (utcToTime $ moment m) `elem` xs
 
 momentChangeWeekNumber :: Moment -> Int -> Maybe Moment
 momentChangeWeekNumber m w = do
   let (UTCTime d t) = moment m
   let tm = utcToTime $ moment m
-  d' <- fromWeekDateValid (year tm) w (fromEnum $ weekDay tm)
-  return $ m{moment = (UTCTime d' t)}
+  d' <- fromMondayStartWeekValid (year tm) w (fromEnum $ weekDay tm)
+  return $ m{moment = UTCTime d' t}
 
 momentChangeYearDay :: Moment -> Int -> Maybe Moment
 momentChangeYearDay m yd = do
   let (UTCTime d t) = moment m
   let tm = utcToTime $ moment m
   d' <- fromOrdinalDateValid (year tm) yd
-  return $ m{moment = (UTCTime d' t)}
+  return $ m{moment = UTCTime d' t}
 
 momentChangeWeekDay :: Moment -> WeekDay -> Maybe Moment
 momentChangeWeekDay m d = do
   let (UTCTime d t) = moment m
-  let (yr, wk, wd) = toWeekDate d
-  d' <- fromWeekDateValid yr wk $ (toEnum wd) + 1
-  return m{moment = (UTCTime d' t)}
+  let yr = fst $ toOrdinalDate d
+  let (wk, wd) = mondayStartWeek d
+  d' <- fromMondayStartWeekValid yr wk $ toEnum (wd + 1 `mod` 6)
+  return m{moment = UTCTime d' t}
 
 -- | @Time@ data type
 data Time = T
@@ -137,12 +146,12 @@ utcToTime :: UTCTime -> Time
 utcToTime (UTCTime utcDay utcTime) = T y (toEnum m) d
                                      hh mm (fromEnum ss)
                                      yDay
-                                     (toEnum dow)
+                                     (toEnum $ dow - 1)
   where
     (y, m, d) = toGregorian utcDay
     (TimeOfDay hh mm ss) = timeToTimeOfDay utcTime
     yDay = snd $ toOrdinalDate utcDay
-    (_, _, dow) = toWeekDate utcDay
+    (_, dow) = mondayStartWeek utcDay
 
 -- | Convert the @Time@ components into a @UTCTime@
 timeToUTC :: Time -> UTCTime
@@ -154,6 +163,13 @@ timeToUTC tm = UTCTime d t
 -- | Construct a @UTCTime@ at midnight
 utcGregorian :: Integer -> Int -> Int -> UTCTime
 utcGregorian y m d = UTCTime (fromGregorian y m d) (timeOfDayToTime midnight)
+
+-- | Construct a @UTCTime@ at a time
+utcGregorianWithTime :: Integer -> Int -> Int -> Int -> Int -> Int -> UTCTime
+utcGregorianWithTime y m d hh mm ss = UTCTime d' t'
+  where
+    d' = fromGregorian y m d
+    t' = timeOfDayToTime (TimeOfDay hh mm (toEnum ss))
 
 -- useful time constants
 oneSecond :: Integer
@@ -211,25 +227,52 @@ next interval = go
     go m@(Weekly _)   = scale oneWeek m
     go m@(Monthly _)  = scaleUTCTime addMonthsRollOver interval m
     go m@(Yearly _)   = scaleUTCTime addYearsRollOver interval m
-    scale = scaleUTCTime addTime 
+    scale x = scaleUTCTime addTime $ interval * x
 
 -- | Generate recurrences from the startDate, filtered by optional rules
-recurBy :: Integer -> Moment -> [Moment -> [Moment]] -> [Moment]
-recurBy interval startDate subRules = nub $ applySubRules $ recurFrom startDate
+recurBy :: Integer -> [Moment -> [Moment]] -> Moment -> [Moment]
+recurBy interval subRules startDate = nub $ applySubRules $ recurFrom startDate
   where
     recurFrom = iterate $ next interval
     fapply fs xs = foldl (\xs' f -> f xs') xs fs
     applySubRules = fapply (map concatMap subRules)
 
 -- | Default interval of 1
-recur :: Moment -> [Moment -> [Moment]] -> [Moment]
+recur :: [Moment -> [Moment]] -> Moment -> [Moment]
 recur = recurBy 1
+
+-- | Generate all days within the frequency
+--   Yearly generates all days in the year
+--   Monthly all days in the month of that year
+--   Weekly all days in the week of that month of that year,
+--   starting on the first day of the week
+moments :: Moment -> [Moment]
+moments m@(Yearly u) = 
+  if isLeapYear (year $ utcToTime u)
+    then map yearly $ take 366 $ recur [] startDate'
+    else map yearly $ take 365 $ recur [] startDate'
+  where
+    yearly = Yearly . moment 
+    startDate = fromJust (momentChangeYearDay m 1)
+    startDate' = Daily $ moment startDate
+moments m@(Monthly u) = map monthly $ take days $ recur [] startDate
+  where
+    monthly = Monthly . moment
+    tm = utcToTime u
+    startDate = Daily $ timeToUTC tm{day = 1}
+    days = monthLength (isLeapYear (year tm)) (fromEnum $ month tm)
+moments m@(Weekly u) = map weekly $ take 7 $ recur [] $ Daily (moment m')
+  where
+    weekly = Weekly . moment
+    tm = utcToTime u
+    delta = fromEnum (weekDay tm) - fromEnum Monday
+    m' = fromJust $ momentChangeYearDay m (yearDay tm - delta)
 
 -- | Normalize an bounded index
 normIndex :: Int -> Int -> Maybe Int
 normIndex max 0 = Nothing
 normIndex max idx =
-  if (abs idx) > max
+  if abs idx > max
     then Nothing
     else Just $ (idx + max') `mod` max'
   where
@@ -283,4 +326,5 @@ byDay days = go (nubSort days)
     go days m@(Minutely _) = limit days weekDay m
     go days m@(Hourly _)   = limit days weekDay m
     go days m@(Daily _)    = limit days weekDay m
-    go days m = mapMaybe (momentChangeWeekDay m) days
+    go days m = filter (\x -> momentElem x weekDay days) $ moments m
+    
