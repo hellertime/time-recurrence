@@ -93,6 +93,22 @@ instance Enum Month where
 
   toEnum unmatched = error ("Month.toEnum: Cannot match " ++ show unmatched)
 
+-- | @DateTime@ data type
+--   This is a componentized version of a time value
+--   simmilar to a 'struct tm'
+data DateTime = DateTime
+    { dtSecond   :: Int
+    , dtMinute   :: Int
+    , dtHour     :: Int
+    , dtDay      :: Int
+    , dtMonth    :: Month
+    , dtYear     :: Integer
+    , dtWeekDay  :: WeekDay
+    , dtYearDay  :: Int
+    , dtTimeZone :: TimeZone
+    }
+  deriving (Show)
+
 -- | @Frequency@ data type
 data Frequency
     = Seconds
@@ -109,62 +125,65 @@ newtype StartOfWeek = StartOfWeek WeekDay
 
 -- | @Moment@ type class
 class Moment a where
-  toDateTime   :: a -> DateTime
-  fromDateTime :: DateTime -> a
-  next         :: Interval -> Frequency -> StartOfWeek -> a -> a
-  prev         :: Interval -> Frequency -> StartOfWeek -> a -> a
-  scaleTime    :: a -> Integer -> a
-  scaleDays    :: (Integer -> Day -> Day) -> a -> Integer -> a
+  toDateTime      :: a -> DateTime
+  fromDateTime    :: DateTime -> Maybe a
+  scaleTime       :: a -> Integer -> a
+  scaleMonths     :: a -> Integer -> a
+  scaleYears      :: a -> Integer -> a
+  alterWeekNumber :: StartOfWeek -> a -> Int -> Maybe a
+  alterYearDay    :: a -> Int -> Maybe a
+  next            :: Interval -> Frequency -> a -> a
+  prev            :: Interval -> Frequency -> a -> a
+ 
+
+instance Moment UTCTime where
+  toDateTime (UTCTime utcDay utcTime) =
+    DateTime (fromEnum seconds) minutes hours
+             year (toEnum month) day
+             weekDay yearDay utc
+    where
+     (TimeOfDay hours minutes seconds = timeToTimeOfDay utcTime
+     (year, month, day) = toGregorian utcDay
+     yearDay = snd $ toOrdinalDate utcDay
+     weekDay = toEnum $ (snd $ mondayStarWeek utcDay) - 1
+
+  fromDateTime dt = do
+      day <- fromGregorianValid (dtYear dt) (fromEnum $ dtMonth dt) (dtDay dt)
+      time <- makeTimeOfDayValid (dtHour dt) (dtMinute dt) (toEnum $ dtSecond dt)
+      return $ UTCTime day time
+
+  scaleTime = flip addUTCTime . fromIntegral
+  scaleMonths (UTCTime d t) i = UTCTime (addGregorianMonthsRollOver i d) t
+  scaleYears (UTCTime d t) i = UTCTime (addGregorianYearsRollOver i d) t
+
+  -- ^ TODO: Stop ignoring 'sow'
+  alterWeekNumber sow utc@(UTCTime _ time) week = do
+    let dt = toDateTime utc
+    day <- fromMondayStartWeek (dtYear dt) week (fromEnum $ dtWeekDay dt)
+    return $ UTCTime day time
+
+  alterYearDay utc@(UTCTime _ time) yearDay = do
+    let dt = toDateTime utc
+    day <- fromOrdinalDateValid (dtYear dt) yearDay
+    return $ UTCTime day time
+
+  next interval freq =
+    case freq of
+      Seconds -> scale oneSecond
+      Minutes -> scale oneMinute
+      Hours   -> scale oneHour
+      Days    -> scale oneDay
+      Weeks   -> scale oneWeek
+      Months  -> flip scaleMonths interval
+      Years   -> flip scaleYears interval
+    where
+      scale x = flip scaleTime (interval * x)
+
+  prev interval = next (-interval)
 
 -- | Test if (field t) is elem in xs
 momentElem :: Eq a => Moment -> (Time -> a) -> [a] -> Bool
 momentElem m field xs = field (utcToTime $ moment m) `elem` xs
-
-momentChangeWeekNumber :: Moment -> Int -> Maybe Moment
-momentChangeWeekNumber m w = do
-  let (UTCTime _ t) = moment m
-  let tm = utcToTime $ moment m
-  d <- fromMondayStartWeekValid (year tm) w (fromEnum $ weekDay tm)
-  return $ m{moment = UTCTime d t}
-
-momentChangeYearDay :: Moment -> Int -> Maybe Moment
-momentChangeYearDay m yd = do
-  let (UTCTime _ t) = moment m
-  let tm = utcToTime $ moment m
-  d <- fromOrdinalDateValid (year tm) yd
-  return $ m{moment = UTCTime d t}
-
--- | @Time@ data type
-data Time = T
-    { year       :: Integer
-    , month      :: Month
-    , day        :: Int
-    , hour       :: Int
-    , minute     :: Int
-    , second     :: Int
-    , yearDay    :: Int
-    , weekDay    :: WeekDay
-    }
-  deriving (Show)
-
--- | Expand a @UTCTime@ into its @Time@ components
-utcToTime :: UTCTime -> Time
-utcToTime (UTCTime utcDay utcTime) = T y (toEnum m) d
-                                     hh mm (fromEnum ss)
-                                     yDay
-                                     (toEnum $ dow - 1)
-  where
-    (y, m, d) = toGregorian utcDay
-    (TimeOfDay hh mm ss) = timeToTimeOfDay utcTime
-    yDay = snd $ toOrdinalDate utcDay
-    (_, dow) = mondayStartWeek utcDay
-
--- | Convert the @Time@ components into a @UTCTime@
-timeToUTC :: Time -> UTCTime
-timeToUTC tm = UTCTime d t
-  where
-    d = fromGregorian (year tm) (fromEnum $ month tm) (day tm)
-    t = timeOfDayToTime $ TimeOfDay (hour tm) (minute tm) (toEnum $ second tm)
 
 -- | Construct a @UTCTime@ at midnight
 utcGregorian :: Integer -> Int -> Int -> UTCTime
@@ -192,36 +211,6 @@ oneDay    = 24 * oneHour
 
 oneWeek :: Integer
 oneWeek   = 7  * oneDay
-
--- UTCTime addition
-addTime :: Integer -> UTCTime -> UTCTime
-addTime i = addUTCTime (fromIntegral i)
-
-addUTCDays :: (Integer -> Day -> Day) -> Integer -> UTCTime -> UTCTime
-addUTCDays f i (UTCTime d t) = UTCTime (f i d) t
-
-addMonthsRollOver :: Integer -> UTCTime -> UTCTime
-addMonthsRollOver = addUTCDays addGregorianMonthsRollOver
-
-addYearsRollOver :: Integer -> UTCTime -> UTCTime
-addYearsRollOver = addUTCDays addGregorianYearsRollOver
-
--- | Moment addition
-scaleUTCTime :: (Integer -> UTCTime -> UTCTime) -> Integer -> Moment -> Moment 
-scaleUTCTime f s m = m{moment = f s (moment m)}
-
--- | Increment a Moment to its next value
-next :: Integer -> Moment -> Moment
-next interval = go
-  where
-    go m@(Secondly _) = scale oneSecond m
-    go m@(Minutely _) = scale oneMinute m
-    go m@(Hourly _)   = scale oneHour m
-    go m@(Daily _)    = scale oneDay m
-    go m@(Weekly _)   = scale oneWeek m
-    go m@(Monthly _)  = scaleUTCTime addMonthsRollOver interval m
-    go m@(Yearly _)   = scaleUTCTime addYearsRollOver interval m
-    scale x = scaleUTCTime addTime $ interval * x
 
 -- | Generate recurrences from the startDate, filtered by optional rules
 recurBy :: Integer -> [Moment -> [Moment]] -> Moment -> [Moment]
