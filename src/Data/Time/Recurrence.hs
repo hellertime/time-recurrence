@@ -123,6 +123,22 @@ data Frequency
 newtype Interval = Interval Integer
 newtype StartOfWeek = StartOfWeek WeekDay
 
+-- useful time constants
+oneSecond :: Integer
+oneSecond = 1
+
+oneMinute :: Integer
+oneMinute = 60 * oneSecond
+
+oneHour :: Integer
+oneHour   = 60 * oneMinute
+
+oneDay :: Integer
+oneDay    = 24 * oneHour
+
+oneWeek :: Integer
+oneWeek   = 7  * oneDay
+
 -- | @Moment@ type class
 class Moment a where
   toDateTime      :: a -> DateTime
@@ -194,22 +210,6 @@ utcGregorianWithTime y m d hh mm ss = UTCTime d' t'
   where
     d' = fromGregorian y m d
     t' = timeOfDayToTime (TimeOfDay hh mm (toEnum ss))
-
--- useful time constants
-oneSecond :: Integer
-oneSecond = 1
-
-oneMinute :: Integer
-oneMinute = 60 * oneSecond
-
-oneHour :: Integer
-oneHour   = 60 * oneMinute
-
-oneDay :: Integer
-oneDay    = 24 * oneHour
-
-oneWeek :: Integer
-oneWeek   = 7  * oneDay
 
 -- | Generate recurrences from the startDate, filtered by optional rules
 recurBy :: Integer -> [Moment -> [Moment]] -> Moment -> [Moment]
