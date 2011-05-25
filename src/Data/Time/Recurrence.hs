@@ -155,10 +155,10 @@ instance Moment UTCTime where
              year (toEnum month) day
              weekDay yearDay utc
     where
-     (TimeOfDay hours minutes seconds = timeToTimeOfDay utcTime
+     (TimeOfDay hours minutes seconds) = timeToTimeOfDay utcTime
      (year, month, day) = toGregorian utcDay
      yearDay = snd $ toOrdinalDate utcDay
-     weekDay = toEnum $ (snd $ mondayStarWeek utcDay) - 1
+     weekDay = toEnum $ snd (mondayStarWeek utcDay) - 1
 
   fromDateTime dt = do
       day <- fromGregorianValid (dtYear dt) (fromEnum $ dtMonth dt) (dtDay dt)
