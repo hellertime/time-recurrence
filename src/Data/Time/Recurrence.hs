@@ -132,9 +132,22 @@ class Moment a where
   scaleYears      :: a -> Integer -> a
   alterWeekNumber :: StartOfWeek -> a -> Int -> Maybe a
   alterYearDay    :: a -> Int -> Maybe a
-  next            :: Interval -> Frequency -> a -> a
-  prev            :: Interval -> Frequency -> a -> a
- 
+
+  next :: Interval -> Frequency -> a -> a
+  next interval freq =
+    case freq of
+      Seconds -> scale oneSecond
+      Minutes -> scale oneMinute
+      Hours   -> scale oneHour
+      Days    -> scale oneDay
+      Weeks   -> scale oneWeek
+      Months  -> flip scaleMonths interval
+      Years   -> flip scaleYears interval
+    where
+      scale x = flip scaleTime (interval * x)
+
+  prev :: Interval -> Frequency -> a -> a
+  prev interval = next (-interval)
 
 instance Moment UTCTime where
   toDateTime (UTCTime utcDay utcTime) =
@@ -166,20 +179,6 @@ instance Moment UTCTime where
     let dt = toDateTime utc
     day <- fromOrdinalDateValid (dtYear dt) yearDay
     return $ UTCTime day time
-
-  next interval freq =
-    case freq of
-      Seconds -> scale oneSecond
-      Minutes -> scale oneMinute
-      Hours   -> scale oneHour
-      Days    -> scale oneDay
-      Weeks   -> scale oneWeek
-      Months  -> flip scaleMonths interval
-      Years   -> flip scaleYears interval
-    where
-      scale x = flip scaleTime (interval * x)
-
-  prev interval = next (-interval)
 
 -- | Test if (field t) is elem in xs
 momentElem :: Eq a => Moment -> (Time -> a) -> [a] -> Bool
