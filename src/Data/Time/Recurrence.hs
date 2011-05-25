@@ -196,6 +196,39 @@ instance Moment UTCTime where
     day <- fromOrdinalDateValid (dtYear dt) yearDay
     return $ UTCTime day time
 
+-- | The @RecurrenceParameter@ type
+data RecurrenceParameter = RecurrenceParameter
+    { interval    :: Interval
+    , frequency   :: Frequency
+    , startOfWeek :: StartOfWeek
+    }
+  deriving (Show)
+
+mkRP :: Frequency -> RecurrenceParameter
+mkRP f = RecurrenceParameter (Interval 1) f (StartOfWeek Monday)
+
+-- | Some common recurrence parameters
+secondly :: RecurrenceParameter -- ^ Recur every second
+secondly = mkRP Seconds
+
+minutely :: RecurrenceParameter -- ^ Recur every minute
+minutely = mkRP Minutes
+
+hourly :: RecurrenceParameter   -- ^ Recur every hour
+hourly = mkRP Hours
+
+daily :: RecurrenceParameter    -- ^ Recur every day
+daily = mkRP Days
+
+weekly :: RecurrenceParameter   -- ^ Recur every week
+weekly = mkRP Weeks
+
+monthly :: RecurrenceParameter  -- ^ Recur every month
+monthly = mkRP Months
+
+yearly :: RecurrenceParameter   -- ^ Recur every year
+yearly = mkRP Years
+
 -- | Test if (field t) is elem in xs
 momentElem :: Eq a => Moment -> (Time -> a) -> [a] -> Bool
 momentElem m field xs = field (utcToTime $ moment m) `elem` xs
