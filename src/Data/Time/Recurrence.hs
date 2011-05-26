@@ -6,8 +6,18 @@ module Data.Time.Recurrence
       -- * The @Month@ type
     , Month (..)
 
-      -- * The @Moment@ type
+      -- * The @Moment@ type class
     , Moment (..)
+
+      -- * The @RecurrenceParameters@ type
+    , RecurrenceParameters (..)
+    , secondly
+    , minutely
+    , hourly
+    , daily
+    , weekly
+    , monthly
+    , yearly
 
       -- * Generate list of recurring @Moment@
     , recurFrom
@@ -194,6 +204,7 @@ instance Moment UTCTime where
      weekDay = toEnum $ snd (mondayStartWeek utcDay) - 1
 
   fromDateTime dt = do
+      let _ = dtTimeZone dt -- just called here to shut GHC up for now
       day <- fromGregorianValid (dtYear dt) (fromEnum $ dtMonth dt) (dtDay dt)
       time <- makeTimeOfDayValid (dtHour dt) (dtMinute dt) (toEnum $ dtSecond dt)
       return $ UTCTime day (timeOfDayToTime time)
@@ -202,8 +213,8 @@ instance Moment UTCTime where
   scaleMonth (UTCTime d t) i = UTCTime (addGregorianMonthsRollOver i d) t
   scaleYear (UTCTime d t) i = UTCTime (addGregorianYearsRollOver i d) t
 
-  -- ^ TODO: Stop ignoring 'sow'
-  alterWeekNumber sow utc@(UTCTime _ time) week = do
+  -- TODO: First argument is StartOfWeek and is ignored right now. fix.
+  alterWeekNumber _ utc@(UTCTime _ time) week = do
     let dt = toDateTime utc
     day <- fromMondayStartWeekValid (dtYear dt) week (fromEnum $ dtWeekDay dt)
     return $ UTCTime day time
