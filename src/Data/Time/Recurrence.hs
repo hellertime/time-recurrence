@@ -20,7 +20,7 @@ module Data.Time.Recurrence
     , yearly
 
       -- * Generate list of recurring @Moment@
-    , recurFrom
+    , recur
 
       -- * @Recurrence@ type rule effects
     , byMonth
@@ -31,8 +31,10 @@ module Data.Time.Recurrence
     )
   where
 
+import Data.Foldable (Foldable, foldMap)
 import Data.List.Ordered (nub, nubSort)
 import Data.Maybe (mapMaybe, fromJust)
+import Data.Monoid
 import Data.Time
 import Data.Time.Calendar.MonthDay (monthLength)
 import Data.Time.Calendar.OrdinalDate (toOrdinalDate, fromOrdinalDateValid, fromMondayStartWeekValid, mondayStartWeek)
@@ -259,27 +261,33 @@ yearly = mkRP Years
 
 -- | The @Recurrence@ type
 --   a @Recurrence@ is on or more @Moment@s
-newtype Moment a => Recurrence a = Recurrence [a]
+newtype Recurrence a = Recurrence [a] deriving (Show)
+
+instance Monoid (Recurrence a) where
+  mempty = Recurrence []
+  mappend (Recurrence xs) (Recurrence ys) = Recurrence (xs ++ ys)
+
+instance Foldable Recurrence where
+  foldMap f (Recurrence r) = mconcat $ map f r
+
+liftR :: Moment a => ([a] -> [a]) -> Recurrence a -> Recurrence a
+liftR f (Recurrence r) = Recurrence $ f r
 
 mkR :: Moment a => a -> Recurrence a
 mkR x = Recurrence [x]
 
-recurFrom :: Moment a => 
-             [a -> Recurrence a]  -- ^ Sub Rules on Moments
-          -> RecurrenceParameters -- ^ Parameters of the recurrence
-          -> a                    -- ^ Start Date
-          -> Recurrence a         -- ^ Resulting @Recurrence@
-recurFrom subRules params = rNub . applySubRules . recur
+recur :: Moment a => 
+         [Frequency -> a -> Recurrence a]  -- ^ Sub Rules on Moments
+      -> RecurrenceParameters              -- ^ Parameters of the recurrence
+      -> a                                 -- ^ Start Date
+      -> Recurrence a                      -- ^ Resulting @Recurrence@
+recur subRules params = liftR nub . applySubRules . recur'
   where
+    subRules' = map ($ frequency params) subRules
     go = next (interval params) (frequency params)
-    rNub (Recurrence xs) = Recurrence $ nub xs
-    rConcatMap f (Recurrence xs) = Recurrence $ concatMap ((\(Recurrence rs) -> rs) . f) xs
-    recur = Recurrence . iterate go
+    recur' = Recurrence . iterate go
     fapply fs xs = foldl (\xs' f -> f xs') xs fs
-    applySubRules = fapply (map rConcatMap subRules)
-
-rTake :: Moment a => Int -> Recurrence a -> Recurrence a
-rTake n (Recurrence xs) = Recurrence $ take n xs
+    applySubRules = fapply $ map foldMap subRules'
 
 -- | Generate all days within the frequency
 --   Yearly generates all days in the year
@@ -289,16 +297,16 @@ rTake n (Recurrence xs) = Recurrence $ take n xs
 moments :: Moment a => Frequency -> a -> Recurrence a
 moments Years x =
   if isLeapYear $ dtYear $ toDateTime x
-    then rTake 366 $ recurFrom [] daily startDate
-    else rTake 365 $ recurFrom [] daily startDate
+    then liftR (take 366) $ recurFrom [] daily startDate
+    else liftR (take 365) $ recurFrom [] daily startDate
   where
     startDate = fromJust $ alterYearDay x 1
-moments Months x = rTake days $ recurFrom [] daily startDate
+moments Months x = liftR (take days) $ recurFrom [] daily startDate
   where
     dt = toDateTime x
     days = monthLength (isLeapYear (dtYear dt)) (fromEnum $ dtMonth dt)
     startDate = fromJust $ alterDay x 1
-moments Weeks x = rTake 7 $ recurFrom [] daily startDate
+moments Weeks x = liftR (take 7) $ recurFrom [] daily startDate
   where
     dt = toDateTime x
     delta = fromEnum (dtWeekDay dt) - fromEnum Monday
