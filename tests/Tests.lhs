@@ -2,8 +2,7 @@ HUnut test suite of example recurrences lifted from RFC 5545 section 3.8.5.3
 
 > module Main where
 
-> import Test.Framework (Test)
-> import Test.Framework (defaultMain, testGroup)
+> import Test.Framework (Test, defaultMain, testGroup)
 > import Test.Framework.Providers.HUnit
 > import Test.HUnit hiding (Test)
 
@@ -46,12 +45,28 @@ Moment type used (UTCTime)
 
 > tests :: [Test]
 > tests = 
->      [ testGroup "RFC5445 Examples" $ zipWith (testCase . show) [1::Int ..] $
->        [ assertEqual ("Test Daily from "++ show date1 ++" . 10 Occurrences") 
+>      [ testGroup "RFC5445 Examples" $ zipWith (testCase . show) [1::Int ..]
+>        [ assertEqual ("Test Daily from "++ show date1 ++". 10 Occurrences") 
 >            (count 10 $ recur [] dailyUTC{startDate = date1})
 >            (count 10 $ recur [byMonthDay [2 .. 11]] monthlyUTC{startDate = date1})
 >        , assertEqual ("Test Daily from "++ show date1 ++". Until "++ show date2)
 >            (until date2 $ recur [] dailyUTC{startDate = date1})
 >            (until date2 $ recur [byDay [Monday .. Sunday]] monthlyUTC{startDate = date1})
+>        , assertBool ("Test every other day from "++ show date1 ++ ". Cap at 1000")
+>            (checkDayDist 2 $ count 1000 $ recur [] dailyUTC{startDate = date1, interval = toInterval 2})
 >        ]
 >      ]
+
+This is the assertion function for testing the number of days between moments.
+It will be used in a couple of tests, and requires at least two moments to 
+operate correctly.
+
+> dayDist :: [UTCTime] -> [Integer]
+> dayDist [] = []
+> dayDist (_:[]) = []
+> dayDist (x:xs) = fst $ foldl go ([], utcDay x) xs
+>  where
+>    go acc x = let d = utcDay x in (abs (diffDays d (snd acc)):(fst acc), d)
+>    utcDay (UTCTime d _) = d
+> checkDayDist :: Integer -> Recurrence UTCTime -> Bool
+> checkDayDist d rs = all (== d) $ dayDist $ fromRecurrence rs
