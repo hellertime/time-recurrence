@@ -391,6 +391,6 @@ byDay days params = go (frequency params) days
    go Minutes ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
    go Hours   ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
    go Days    ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
-   go freq    ds x = Recurrence $ filter (onDays ds) $ (\(Recurrence xs) -> xs) $ moments params x
+   go _       ds x = Recurrence $ filter (onDays ds) $ (\(Recurrence xs) -> xs) $ moments params x
      where
        onDays ds x = dtWeekDay (toDateTime x) `elem` ds
