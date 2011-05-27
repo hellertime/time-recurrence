@@ -152,6 +152,7 @@ oneWeek   = 7  * oneDay
 -- | @Moment@ type class
 class Ord a => Moment a where
   -- ^ Minimum Definition
+  epoch           :: a
   toDateTime      :: a -> DateTime
   fromDateTime    :: DateTime -> Maybe a
   scaleTime       :: a -> Integer -> a
@@ -198,6 +199,7 @@ class Ord a => Moment a where
   prev (Interval interval) = next $ Interval (-interval)
 
 instance Moment UTCTime where
+  epoch = UTCTime (toEnum 0) 0
   toDateTime (UTCTime utcDay utcTime) =
     DateTime (fromEnum seconds) minutes hours
              day (toEnum month) year
@@ -230,36 +232,37 @@ instance Moment UTCTime where
     return $ UTCTime day time
 
 -- | The @RecurrenceParameters@ type
-data RecurrenceParameters = RecurrenceParameters
+data RecurrenceParameters a = RecurrenceParameters
     { interval    :: Interval
     , frequency   :: Frequency
     , startOfWeek :: StartOfWeek
+    , startDate   :: a
     }
   deriving (Show)
 
-mkRP :: Frequency -> RecurrenceParameters
-mkRP f = RecurrenceParameters (Interval 1) f (StartOfWeek Monday)
+mkRP :: Moment a => Frequency -> RecurrenceParameters a
+mkRP f = RecurrenceParameters (Interval 1) f (StartOfWeek Monday) epoch
 
 -- | Some common recurrence parameters
-secondly :: RecurrenceParameters -- ^ Recur every second
+secondly :: Moment a => RecurrenceParameters a -- ^ Recur every second
 secondly = mkRP Seconds
 
-minutely :: RecurrenceParameters -- ^ Recur every minute
+minutely :: Moment a => RecurrenceParameters a -- ^ Recur every minute
 minutely = mkRP Minutes
 
-hourly :: RecurrenceParameters   -- ^ Recur every hour
+hourly :: Moment a => RecurrenceParameters a   -- ^ Recur every hour
 hourly = mkRP Hours
 
-daily :: RecurrenceParameters    -- ^ Recur every day
+daily :: Moment a => RecurrenceParameters a   -- ^ Recur every day
 daily = mkRP Days
 
-weekly :: RecurrenceParameters   -- ^ Recur every week
+weekly :: Moment a => RecurrenceParameters a   -- ^ Recur every week
 weekly = mkRP Weeks
 
-monthly :: RecurrenceParameters  -- ^ Recur every month
+monthly :: Moment a => RecurrenceParameters a -- ^ Recur every month
 monthly = mkRP Months
 
-yearly :: RecurrenceParameters   -- ^ Recur every year
+yearly :: Moment a => RecurrenceParameters a  -- ^ Recur every year
 yearly = mkRP Years
 
 -- | The @Recurrence@ type
@@ -280,14 +283,15 @@ mkR :: Moment a => a -> Recurrence a
 mkR x = Recurrence [x]
 
 recur :: Moment a => 
-         [Frequency -> a -> Recurrence a]  -- ^ Sub Rules on Moments
-      -> RecurrenceParameters              -- ^ Parameters of the recurrence
-      -> a                                 -- ^ Start Date
+         [RecurrenceParameters a 
+         -> a 
+         -> Recurrence a]                  -- ^ Sub Rules on Moments
+      -> RecurrenceParameters a            -- ^ Parameters of the recurrence
       -> Recurrence a                      -- ^ Resulting @Recurrence@
-recur subRules params = liftR nub . applySubRules . recur'
+recur subRules params = liftR nub $ applySubRules $ recur' (startDate params)
   where
-    subRules' = map ($ frequency params) subRules
-    go = next (interval params) (frequency params)
+    subRules' = map ($ params) subRules
+    go = next (interval params) (frequency params) 
     recur' = Recurrence . iterate go
     fapply fs xs = foldl (\xs' f -> f xs') xs fs
     applySubRules = fapply $ map foldMap subRules'
@@ -306,24 +310,29 @@ until m = liftR $ takeWhile (<= m)
 --   Monthly all days in the month of that year
 --   Weekly all days in the week of that month of that year,
 --   starting on the first day of the week
-moments :: Moment a => Frequency -> a -> Recurrence a
-moments Years x =
-  if isLeapYear $ dtYear $ toDateTime x
-    then liftR (take 366) $ recur [] daily startDate
-    else liftR (take 365) $ recur [] daily startDate
+moments :: Moment a => RecurrenceParameters a -> a -> Recurrence a
+moments params = go (frequency params)
   where
-    startDate = fromJust $ alterYearDay x 1
-moments Months x = liftR (take days) $ recur [] daily startDate
-  where
-    dt = toDateTime x
-    days = monthLength (isLeapYear (dtYear dt)) (fromEnum $ dtMonth dt)
-    startDate = fromJust $ alterDay x 1
-moments Weeks x = liftR (take 7) $ recur [] daily startDate
-  where
-    dt = toDateTime x
-    delta = fromEnum (dtWeekDay dt) - fromEnum Monday
-    startDate = fromJust $ alterYearDay x $ dtYearDay dt - delta
-moments _ x = mkR x
+    go Years x =
+      if isLeapYear $ dtYear $ toDateTime x
+        then liftR (take 366) $ recur [] params'
+        else liftR (take 365) $ recur [] params'
+      where
+        params' = params{startDate = startDate', frequency = Days}
+        startDate' = fromJust $ alterYearDay x 1
+    go Months x = liftR (take days) $ recur [] params'
+      where
+        dt = toDateTime x
+        days = monthLength (isLeapYear (dtYear dt)) (fromEnum $ dtMonth dt)
+        params' = params{startDate = startDate', frequency = Days}
+        startDate' = fromJust $ alterDay x 1
+    go Weeks x = liftR (take 7) $ recur [] params'
+      where
+        dt = toDateTime x
+        delta = fromEnum (dtWeekDay dt) - fromEnum Monday
+        params' = params{startDate = startDate', frequency = Days}
+        startDate' = fromJust $ alterYearDay x $ dtYearDay dt - delta
+    go _     x = mkR x
 
 -- | Normalize an bounded index
 --   Pass an upper-bound 'ub' and an index 'idx'
@@ -338,19 +347,22 @@ normIndex ub idx =
   where
     ub' = ub + 1
 
-byMonth :: Moment a => [Month] -> Frequency -> a -> Recurrence a
-byMonth months Years x = Recurrence $ mapMaybe (alterMonth x) months
-byMonth months _ x = Recurrence [x | dtMonth (toDateTime x) `elem` months]
-
-byWeekNumber :: Moment a => [Int] -> Frequency -> a -> Recurrence a 
-byWeekNumber weeks Years x = Recurrence $ mapMaybe (alterWeekNumber sow x) weeks'
+byMonth :: Moment a => [Month] -> RecurrenceParameters a -> a -> Recurrence a
+byMonth months params = go (frequency params) months
   where
-    sow = StartOfWeek Monday -- TODO: this needs to be a parameter!
-    weeks' = nubSort $ mapMaybe (normIndex 53) weeks
-byWeekNumber _ _ x = mkR x
+    go Years mts x = Recurrence $ mapMaybe (alterMonth x) mts
+    go _     mts x = Recurrence [x | dtMonth (toDateTime x) `elem` mts]
 
-byYearDay :: Moment a => [Int] -> Frequency -> a -> Recurrence a
-byYearDay days freq = go freq days'
+byWeekNumber :: Moment a => [Int] -> RecurrenceParameters a -> a -> Recurrence a 
+byWeekNumber weeks params = go (frequency params) weeks'
+  where
+    sow = startOfWeek params
+    go Years wks x = Recurrence $ mapMaybe (alterWeekNumber sow x) wks
+    go _     _   x = mkR x
+    weeks' = nubSort $ mapMaybe (normIndex 53) weeks
+
+byYearDay :: Moment a => [Int] -> RecurrenceParameters a -> a -> Recurrence a
+byYearDay days params = go (frequency params) days'
   where
     days' = nubSort $ mapMaybe (normIndex 366) days
     go Seconds ds x = Recurrence [x | dtYearDay (toDateTime x) `elem` ds]
@@ -361,8 +373,8 @@ byYearDay days freq = go freq days'
     go Months  _  x = mkR x
     go Years ds x = Recurrence $ mapMaybe (alterYearDay x) ds
 
-byMonthDay :: Moment a => [Int] -> Frequency -> a -> Recurrence a
-byMonthDay days freq = go freq days'
+byMonthDay :: Moment a => [Int] -> RecurrenceParameters a -> a -> Recurrence a
+byMonthDay days params = go (frequency params) days'
   where
     days' = nubSort $ mapMaybe (normIndex 31) days
     go Seconds ds x = Recurrence [x | dtDay (toDateTime x) `elem` ds]
@@ -371,13 +383,13 @@ byMonthDay days freq = go freq days'
     go Days    ds x = Recurrence [x | dtDay (toDateTime x) `elem` ds]
     go _       ds x = Recurrence $ mapMaybe (alterDay x) ds
 
-byDay :: Moment a => [WeekDay] -> Frequency -> a -> Recurrence a
-byDay days freq = go freq days
+byDay :: Moment a => [WeekDay] -> RecurrenceParameters a -> a -> Recurrence a
+byDay days params = go (frequency params) days
   where
    go Seconds ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
    go Minutes ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
    go Hours   ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
    go Days    ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
-   go freq    ds x = Recurrence $ filter (onDays ds) $ (\(Recurrence xs) -> xs) $ moments freq x
+   go freq    ds x = Recurrence $ filter (onDays ds) $ (\(Recurrence xs) -> xs) $ moments params x
      where
        onDays ds x = dtWeekDay (toDateTime x) `elem` ds
