@@ -36,14 +36,22 @@ to use.
 > main :: IO ()
 > main = defaultMain tests
 
+We must provide type-qualified versions of the initializers for the
+Moment type used (UTCTime)
+
+> dailyUTC :: RecurrenceParameters UTCTime
+> dailyUTC = daily
+> monthlyUTC :: RecurrenceParameters UTCTime
+> monthlyUTC = monthly
+
 > tests :: [Test]
 > tests = 
 >      [ testGroup "RFC5445 Examples" $ zipWith (testCase . show) [1::Int ..] $
 >        [ assertEqual ("Test Daily from "++ show date1 ++" . 10 Occurrences") 
->            (count 10 $ recur [] daily date1)
->            (count 10 $ recur [byMonthDay [2 .. 11]] monthly date1)
+>            (count 10 $ recur [] dailyUTC{startDate = date1})
+>            (count 10 $ recur [byMonthDay [2 .. 11]] monthlyUTC{startDate = date1})
 >        , assertEqual ("Test Daily from "++ show date1 ++". Until "++ show date2)
->            (until date2 $ recur [] daily date1)
->            (until date2 $ recur [byDay [Monday .. Sunday]] monthly date1)
+>            (until date2 $ recur [] dailyUTC{startDate = date1})
+>            (until date2 $ recur [byDay [Monday .. Sunday]] monthlyUTC{startDate = date1})
 >        ]
 >      ]
