@@ -1,7 +1,10 @@
 module Data.Time.Recurrence
     (
+      -- * The @DateTime@ type
+      DateTime (..)
+
       -- * The @WeekDay@ type
-      WeekDay (..)
+    , WeekDay (..)
 
       -- * The @Month@ type
     , Month (..)
@@ -18,6 +21,10 @@ module Data.Time.Recurrence
     , weekly
     , monthly
     , yearly
+
+      -- * Types in @RecurrenceParameters@
+    , Interval
+    , StartOfWeek
 
       -- * Generate list of recurring @Moment@
     , recur
