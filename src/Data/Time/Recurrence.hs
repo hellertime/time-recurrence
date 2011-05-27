@@ -22,14 +22,17 @@ module Data.Time.Recurrence
     , monthly
     , yearly
 
-      -- * Types in @RecurrenceParameters@
-    , Interval
-    , StartOfWeek
+      -- * create types in @RecurrenceParameters@
+    , toInterval
+    , toStartOfWeek
 
       -- * Generate list of recurring @Moment@
     , recur
     , count
     , until
+
+      -- * The @Recurrence@ type
+    , Recurrence (fromRecurrence)
 
       -- * @Recurrence@ type rule effects
     , byMonth
@@ -139,6 +142,12 @@ data Frequency
 
 newtype Interval = Interval Integer deriving (Show)
 newtype StartOfWeek = StartOfWeek WeekDay deriving (Show)
+
+toInterval :: Integer -> Interval
+toInterval = Interval
+
+toStartOfWeek :: WeekDay -> StartOfWeek
+toStartOfWeek = StartOfWeek
 
 -- useful time constants
 oneSecond :: Integer
@@ -274,7 +283,7 @@ yearly = mkRP Years
 
 -- | The @Recurrence@ type
 --   a @Recurrence@ is on or more @Moment@s
-newtype Recurrence a = Recurrence [a] deriving (Show, Ord, Eq)
+newtype Recurrence a = Recurrence { fromRecurrence :: [a] } deriving (Show, Ord, Eq)
 
 instance Monoid (Recurrence a) where
   mempty = Recurrence []
