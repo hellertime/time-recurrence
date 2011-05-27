@@ -42,6 +42,8 @@ Moment type used (UTCTime)
 > dailyUTC = daily
 > monthlyUTC :: RecurrenceParameters UTCTime
 > monthlyUTC = monthly
+> yearlyUTC :: RecurrenceParameters UTCTime
+> yearlyUTC = yearly
 
 > tests :: [Test]
 > tests = 
@@ -52,8 +54,11 @@ Moment type used (UTCTime)
 >        , assertEqual ("Test Daily from "++ show date1 ++". Until "++ show date2)
 >            (until date2 $ recur [] dailyUTC{startDate = date1})
 >            (until date2 $ recur [byDay [Monday .. Sunday]] monthlyUTC{startDate = date1})
->        , assertBool ("Test every other day from "++ show date1 ++ ". Cap at 1000")
->            (checkDayDist 2 $ count 1000 $ recur [] dailyUTC{startDate = date1, interval = toInterval 2})
+>        , assertBool ("Test every other day from "++ show date1 ++". Cap at 10000")
+>            (checkDayDist 2 $ count 10000 $ recur [] dailyUTC{startDate = date1, interval = toInterval 2})
+>        , assertEqual ("Test every 10 days from "++ show date1 ++". 5 Occurrences")
+>            (count 5 $ recur [] dailyUTC{startDate = date1, interval = toInterval 10})
+>            (count 5 $ recur [byMonth [September,October], byMonthDay [2,12,22]] yearlyUTC{startDate = date1})
 >        ]
 >      ]
 
