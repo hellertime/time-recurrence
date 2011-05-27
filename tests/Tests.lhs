@@ -59,6 +59,9 @@ Moment type used (UTCTime)
 >        , assertEqual ("Test every 10 days from "++ show date1 ++". 5 Occurrences")
 >            (count 5 $ recur [] dailyUTC{startDate = date1, interval = toInterval 10})
 >            (count 5 $ recur [byMonth [September,October], byMonthDay [2,12,22]] yearlyUTC{startDate = date1})
+>        , assertEqual "Test every day in Jan. for 3 years"
+>            (until date4 $ recur [byMonth [January], byDay [Monday .. Sunday]] yearlyUTC{startDate = date3})
+>            (until date4 $ recur [byMonth [January]] dailyUTC{startDate = date3})
 >        ]
 >      ]
 
