@@ -319,19 +319,20 @@ moments params = go (frequency params)
         else liftR (take 365) $ recur [] params'
       where
         params' = params{startDate = startDate', frequency = Days}
-        startDate' = fromJust $ alterYearDay x 1
+        startDate' = max (fromJust $ alterYearDay x 1) (startDate params)
     go Months x = liftR (take days) $ recur [] params'
       where
         dt = toDateTime x
         days = monthLength (isLeapYear (dtYear dt)) (fromEnum $ dtMonth dt)
         params' = params{startDate = startDate', frequency = Days}
-        startDate' = fromJust $ alterDay x 1
+        startDate' = max (fromJust $ alterDay x 1) (startDate params)
     go Weeks x = liftR (take 7) $ recur [] params'
       where
         dt = toDateTime x
         delta = fromEnum (dtWeekDay dt) - fromEnum Monday
         params' = params{startDate = startDate', frequency = Days}
-        startDate' = fromJust $ alterYearDay x $ dtYearDay dt - delta
+        yearDay' = dtYearDay dt - delta
+        startDate' = max (fromJust $ alterYearDay x yearDay') (startDate params)
     go _     x = mkR x
 
 -- | Normalize an bounded index
@@ -390,6 +391,6 @@ byDay days params = go (frequency params) days
    go Minutes ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
    go Hours   ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
    go Days    ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
-   go freq    ds x = Recurrence $ filter (onDays ds) $ (\(Recurrence xs) -> xs) $ moments params x
+   go _       ds x = Recurrence $ filter (onDays ds) $ (\(Recurrence xs) -> xs) $ moments params x
      where
        onDays ds x = dtWeekDay (toDateTime x) `elem` ds
