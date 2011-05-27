@@ -18,6 +18,7 @@ into UTC.
 > import Data.Time
 > import Data.Maybe (fromJust)
 
+> import Prelude hiding (until)
 > import Data.Time.Recurrence
 
 We are certain of the validity of the dates used, and so fromJust is safe
@@ -38,8 +39,11 @@ to use.
 > tests :: [Test]
 > tests = 
 >      [ testGroup "RFC5445 Examples" $ zipWith (testCase . show) [1::Int ..] $
->        [ assertEqual "Test Daily. 10 Occurrences" 
+>        [ assertEqual ("Test Daily from "++ show date1 ++" . 10 Occurrences") 
 >            (count 10 $ recur [] daily date1)
->            (count 10 $ recur [byMonthDay [2..11]] monthly date1)
+>            (count 10 $ recur [byMonthDay [2 .. 11]] monthly date1)
+>        , assertEqual ("Test Daily from "++ show date1 ++". Until "++ show date2)
+>            (until date2 $ recur [] daily date1)
+>            (until date2 $ recur [byDay [Monday .. Sunday]] monthly date1)
 >        ]
 >      ]
