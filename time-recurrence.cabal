@@ -49,7 +49,7 @@ Cabal-version:       >=1.6
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
 Extra-source-files:  
-  README, AUTHORS
+  README, AUTHORS, tests/Tests.lhs
 
 source-repository head
   type: git
