@@ -21,6 +21,8 @@ module Data.Time.Recurrence
 
       -- * Generate list of recurring @Moment@
     , recur
+    , count
+    , until
 
       -- * @Recurrence@ type rule effects
     , byMonth
@@ -31,6 +33,7 @@ module Data.Time.Recurrence
     )
   where
 
+import Prelude hiding (until)
 import Data.Foldable (Foldable, foldMap)
 import Data.List.Ordered (nub, nubSort)
 import Data.Maybe (mapMaybe, fromJust)
@@ -261,7 +264,7 @@ yearly = mkRP Years
 
 -- | The @Recurrence@ type
 --   a @Recurrence@ is on or more @Moment@s
-newtype Recurrence a = Recurrence [a] deriving (Show)
+newtype Recurrence a = Recurrence [a] deriving (Show, Ord, Eq)
 
 instance Monoid (Recurrence a) where
   mempty = Recurrence []
@@ -289,6 +292,15 @@ recur subRules params = liftR nub . applySubRules . recur'
     fapply fs xs = foldl (\xs' f -> f xs') xs fs
     applySubRules = fapply $ map foldMap subRules'
 
+-- | Limit recurrence results to a count
+count :: Moment a => Int -> Recurrence a -> Recurrence a
+count = liftR . take
+
+
+-- | Limit recurrence results to a max date
+until :: Moment a => a -> Recurrence a -> Recurrence a
+until m = liftR $ takeWhile (<= m)
+
 -- | Generate all days within the frequency
 --   Yearly generates all days in the year
 --   Monthly all days in the month of that year
@@ -297,16 +309,16 @@ recur subRules params = liftR nub . applySubRules . recur'
 moments :: Moment a => Frequency -> a -> Recurrence a
 moments Years x =
   if isLeapYear $ dtYear $ toDateTime x
-    then liftR (take 366) $ recurFrom [] daily startDate
-    else liftR (take 365) $ recurFrom [] daily startDate
+    then liftR (take 366) $ recur [] daily startDate
+    else liftR (take 365) $ recur [] daily startDate
   where
     startDate = fromJust $ alterYearDay x 1
-moments Months x = liftR (take days) $ recurFrom [] daily startDate
+moments Months x = liftR (take days) $ recur [] daily startDate
   where
     dt = toDateTime x
     days = monthLength (isLeapYear (dtYear dt)) (fromEnum $ dtMonth dt)
     startDate = fromJust $ alterDay x 1
-moments Weeks x = liftR (take 7) $ recurFrom [] daily startDate
+moments Weeks x = liftR (take 7) $ recur [] daily startDate
   where
     dt = toDateTime x
     delta = fromEnum (dtWeekDay dt) - fromEnum Monday
