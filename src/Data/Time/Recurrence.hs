@@ -298,7 +298,7 @@ normIndex ub idx =
     ub' = ub + 1
 
 mapNormIndex :: Int -> [a] -> [a]
-mapNormIndex n xs = mapMaybe (normIndex n) xs
+mapNormIndex n = mapMaybe (normIndex n)
 
 -- | 'restrict', applied to a predicate and a @Schedule@, returns a @Schedule@
 -- of those moments that statisfy the predicate.
@@ -306,7 +306,7 @@ restrict :: Moment a => (a -> Bool) -> Schedule a -> RecurringSchedule a
 restrict f s = return $ Schedule $ filter f $ fromSchedule s
 
 by :: (Moment a, Ord b) => (DateTime -> b) -> [b] -> a -> Bool
-by f bs = \a -> f (toDateTime a) `elem` (nubSort bs)
+by f bs a = f (toDateTime a) `elem` nubSort bs
 
 by' :: Moment a => (DateTime -> Int) -> Int -> [Int] -> a -> Bool
 by' f n bs = by f $ mapNormIndex n bs
@@ -358,10 +358,10 @@ onMonths :: Moment a => [Month] -> a -> b -> Reader (InitialMoment a) [a]
 onMonths = on alterMonth
 
 onYearDays :: Moment a => [Int] -> a -> b -> Reader (InitialMoment a) [a]
-onYearDays = on alterYearDay . (mapNormIndex 366)
+onYearDays = on alterYearDay . mapNormIndex 366
 
 onWeekNumbers :: Moment a => [Int] -> a -> b -> Reader (InitialMoment a) [a]
-onWeekNumbers = on' (\i -> alterWeekNumber (startOfWeek i)) . (mapNormIndex 53)
+onWeekNumbers = on' (alterWeekNumber . startOfWeek) . mapNormIndex 53
 -- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
 instance Moment UTCTime where
