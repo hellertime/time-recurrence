@@ -16,12 +16,14 @@ module Data.Time.Recurrence
     )
   where
 
+import Control.Applicative
 import Control.Monad.Reader
 import Data.List.Ordered (nubSort)
 import Data.Maybe (mapMaybe)
 import Data.Time
 import Data.Time.Calendar.MonthDay (monthLength)
 import Data.Time.Calendar.OrdinalDate (toOrdinalDate, fromOrdinalDateValid, fromMondayStartWeekValid, mondayStartWeek)
+import Data.Traversable
 
 -- | Symbolic week days.
 --
@@ -284,6 +286,40 @@ enumFutureMoments = enumMoments next
 enumPastMoments :: Moment a => RecurringSchedule a
 enumPastMoments = enumMoments prev
 
+-- | 'enumPeriod' produces a period of /n/ moments from the 'startDate'.
+enumPeriod :: Moment a => Int -> RecurringSchedule a
+enumPeriod n = do
+  i <- ask
+  return $ Schedule $ take n $ iterateMoments step (moment i)
+  where
+    step = next (interval i) (frequency i)
+
+-- | 'enumYear' produces a period of /n/ days within the current year
+enumYear :: Moment a => RecurringSchedule a
+enumYear = do
+  i <- ask
+  if isLeapYear $ dtYear $ toDateTime (moment i)
+    then local setPeriod (enumPeriod 365)
+    else local setPeriod (enumPeriod 366)
+  where
+    setPeriod i = let
+      m = moment i
+      startDate' = max (fromJust $ alterYearDay m 1) (startDate i)
+      in i{startDate = startDate', frequency = Days}
+
+-- | 'enumMonths' produces a period of /n/ days withing the current month
+enumMonths :: Moment a => RecurringSchedule a
+enumMonths = do
+  i <- ask
+  let dt = toDateTime (moment i)
+  let days = monthLength (isLeapYear $ dtYear dt) (fromEnum $ dtMonth dt)
+  local setPeriod (enumPeriod days)
+  where
+    setPeriod i = let
+      m = moment i
+      startDate' = max (fromJust $ alterDay m 1) (startDate i)
+      in i{startDate = startDate', frequency = Days}
+
 -- | Normalize an bounded index
 --   Pass an upper-bound 'ub' and an index 'idx'
 --   Converts 'idx' < 0 into valid 'idx' > 0 or
@@ -297,7 +333,7 @@ normIndex ub idx =
   where
     ub' = ub + 1
 
-mapNormIndex :: Int -> [a] -> [a]
+mapNormIndex :: Int -> [Int] -> [Int]
 mapNormIndex n = mapMaybe (normIndex n)
 
 -- | 'restrict', applied to a predicate and a @Schedule@, returns a @Schedule@
@@ -332,12 +368,16 @@ byMonths = by dtMonth
 byYearDays :: Moment a => [Int] -> a -> Bool
 byYearDays = by' dtYearDay 366
 
+-- monadic concatMap
+concatMapM :: Applicative m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f xs = concat <$> traverse f xs
+
 -- | 'expand', takes an expansion function and a @Schedule@, and maps the
 -- expansion function over the moments.
 -- Each moment is then replaced with its expansions.
-expand :: Moment a => (a -> b -> Reader (InitialMoment a) [a]) -> Schedule a -> RecurringSchedule a
+expand :: Moment a => (a -> Reader (InitialMoment a) [a]) -> Schedule a -> RecurringSchedule a
 expand f s = do
-  xs <- liftM2 concatMap f $ return (fromSchedule s)
+  xs <- concatMapM f (fromSchedule s)
   return $ Schedule xs
 
 on :: Moment a => 
@@ -345,23 +385,27 @@ on :: Moment a =>
    -> [b] 
    -> a 
    -> Reader (InitialMoment a) [a]
-on f bs = return $ \a -> mapMaybe (f a) bs
+on f bs a = return $ mapMaybe (f a) bs
 
 on' :: Moment a =>
        (InitialMoment a -> a -> b -> Maybe a)
      -> [b]
      -> a
      -> Reader (InitialMoment a) [a]
-on' f bs = ask >>= \i -> on (f i) bs
+on' f bs a = ask >>= \i -> on (f i) bs a
 
-onMonths :: Moment a => [Month] -> a -> b -> Reader (InitialMoment a) [a]
+onMonths :: Moment a => [Month] -> a -> Reader (InitialMoment a) [a]
 onMonths = on alterMonth
 
-onYearDays :: Moment a => [Int] -> a -> b -> Reader (InitialMoment a) [a]
-onYearDays = on alterYearDay . mapNormIndex 366
+onYearDays :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
+onYearDays ds = on alterYearDay (mapNormIndex 366 ds)
 
-onWeekNumbers :: Moment a => [Int] -> a -> b -> Reader (InitialMoment a) [a]
-onWeekNumbers = on' (alterWeekNumber . startOfWeek) . mapNormIndex 53
+onWeekNumbers :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
+onWeekNumbers ds = on' (alterWeekNumber . startOfWeek) (mapNormIndex 53 ds)
+
+onWeekDays :: Moment a -> [WeekDay] -> a -> Reader (InitialMoment a) [a]
+onWeekDays
+
 -- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
 instance Moment UTCTime where
