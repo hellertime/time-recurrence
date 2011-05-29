@@ -284,11 +284,6 @@ enumFutureMoments = enumMoments next
 enumPastMoments :: Moment a => RecurringSchedule a
 enumPastMoments = enumMoments prev
 
--- | 'restrict', applied to a predicate and a @Schedule@, returns a @Schedule@
--- of those moments that statisfy the predicate.
-restrict :: Moment a => (a -> Bool) -> Schedule a -> RecurringSchedule a
-restrict f s = return $ Schedule $ filter f $ fromSchedule s
-
 -- | Normalize an bounded index
 --   Pass an upper-bound 'ub' and an index 'idx'
 --   Converts 'idx' < 0 into valid 'idx' > 0 or
@@ -302,36 +297,71 @@ normIndex ub idx =
   where
     ub' = ub + 1
 
+mapNormIndex :: Int -> [a] -> [a]
+mapNormIndex n xs = mapMaybe (normIndex n) xs
+
+-- | 'restrict', applied to a predicate and a @Schedule@, returns a @Schedule@
+-- of those moments that statisfy the predicate.
+restrict :: Moment a => (a -> Bool) -> Schedule a -> RecurringSchedule a
+restrict f s = return $ Schedule $ filter f $ fromSchedule s
+
 by :: (Moment a, Ord b) => (DateTime -> b) -> [b] -> a -> Bool
 by f bs = \a -> f (toDateTime a) `elem` (nubSort bs)
 
 by' :: Moment a => (DateTime -> Int) -> Int -> [Int] -> a -> Bool
-by' f n bs = by f (mapMaybe (normIndex n) bs)
+by' f n bs = by f $ mapNormIndex n bs
 
-bySeconds :: (Moment a) => [Int] -> a -> Bool
+bySeconds :: Moment a => [Int] -> a -> Bool
 bySeconds = by dtSecond
 
-byMinutes :: (Moment a) => [Int] -> a -> Bool
+byMinutes :: Moment a => [Int] -> a -> Bool
 byMinutes = by dtMinute
 
-byHours :: (Moment a) => [Int] -> a -> Bool
+byHours :: Moment a => [Int] -> a -> Bool
 byHours = by dtHour
 
-byWeekDays :: (Moment a) => [WeekDay] -> a -> Bool
+byWeekDays :: Moment a => [WeekDay] -> a -> Bool
 byWeekDays = by dtWeekDay
 
-byMonthDays :: (Moment a) => [Int] -> a -> Bool
+byMonthDays :: Moment a => [Int] -> a -> Bool
 byMonthDays = by' dtDay 31
 
-byMonths :: (Moment a) => [Month] -> a -> Bool
+byMonths :: Moment a => [Month] -> a -> Bool
 byMonths = by dtMonth
 
-byYears :: (Moment a) => [Integer] -> a -> Bool
-byYears = by dtYear
-
-byYearDays :: (Moment a) => [Int] -> a -> Bool
+byYearDays :: Moment a => [Int] -> a -> Bool
 byYearDays = by' dtYearDay 366
 
+-- | 'expand', takes an expansion function and a @Schedule@, and maps the
+-- expansion function over the moments.
+-- Each moment is then replaced with its expansions.
+expand :: Moment a => (a -> b -> Reader (InitialMoment a) [a]) -> Schedule a -> RecurringSchedule a
+expand f s = do
+  xs <- liftM2 concatMap f $ return (fromSchedule s)
+  return $ Schedule xs
+
+on :: Moment a => 
+      (a -> b -> Maybe a) 
+   -> [b] 
+   -> a 
+   -> Reader (InitialMoment a) [a]
+on f bs = return $ \a -> mapMaybe (f a) bs
+
+on' :: Moment a =>
+       (InitialMoment a -> a -> b -> Maybe a)
+     -> [b]
+     -> a
+     -> Reader (InitialMoment a) [a]
+on' f bs = ask >>= \i -> on (f i) bs
+
+onMonths :: Moment a => [Month] -> a -> b -> Reader (InitialMoment a) [a]
+onMonths = on alterMonth
+
+onYearDays :: Moment a => [Int] -> a -> b -> Reader (InitialMoment a) [a]
+onYearDays = on alterYearDay . (mapNormIndex 366)
+
+onWeekNumbers :: Moment a => [Int] -> a -> b -> Reader (InitialMoment a) [a]
+onWeekNumbers = on' (\i -> alterWeekNumber (startOfWeek i)) . (mapNormIndex 53)
 -- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
 instance Moment UTCTime where
