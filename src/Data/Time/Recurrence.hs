@@ -9,9 +9,49 @@ module Data.Time.Recurrence
       -- * The @Moment@ type class
     , Moment (..)
 
-      -- * create types in @RecurrenceParameters@
+      -- * The @InitialMoment@ type
+    , InitialMoment (..)
+
     , toInterval
     , toStartOfWeek
+
+    , secondly
+    , minutely
+    , hourly
+    , daily
+    , weekly
+    , monthly
+    , yearly
+
+    , secondlyUTC
+    , minutelyUTC
+    , hourlyUTC
+    , dailyUTC
+    , weeklyUTC
+    , monthlyUTC
+    , yearlyUTC
+
+      -- * Recurrence combinators
+    , enumYear
+    , enumMonth
+    , enumWeek
+
+    , restrict
+    , bySeconds
+    , byMinutes
+    , byHours
+    , byWeekDays
+    , byMonthDays
+    , byMonths
+    , byYearDays
+
+    , expand
+    , onWeekNumbers
+    , onMonths
+    , onYearDays
+
+    , repeatSchedule
+    , repeatSchedule'
     )
   where
 
@@ -420,19 +460,18 @@ onYearDays ds = on alterYearDay (mapNormIndex 366 ds)
 onWeekNumbers :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
 onWeekNumbers ds = on' (alterWeekNumber . startOfWeek) (mapNormIndex 53 ds)
 
--- | 'repeatSchedule' runs a schedule with a given /init/
+-- | 'repeatSchedule' runs a schedule with a given /init/ and rule /r/
 repeatSchedule :: Moment a => 
                   InitialMoment a 
                -> (Schedule a -> RecurringSchedule a)
                -> [a]
-repeatSchedule init s = fromSchedule $ runReader (enumFutureMoments >>= s) init
+repeatSchedule init r = fromSchedule $ runReader (enumFutureMoments >>= r) init
 
--- | 'repeatSchedule'' is like 'repeatSchedule' but generated past moments
+-- | 'repeatSchedule'' is like 'repeatSchedule' but it takes no rules
 repeatSchedule' :: Moment a =>
                    InitialMoment a
-                -> (Schedule a -> RecurringSchedule a)
                 -> [a]
-repeatSchedule' init s = fromSchedule $ runReader (enumPastMoments >>= s) init
+repeatSchedule' init = repeatSchedule init return
 
 -- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
