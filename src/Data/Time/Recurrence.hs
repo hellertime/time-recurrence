@@ -306,8 +306,9 @@ enumPeriodFrom i' beg end = local (const i') (enumPeriod beg end)
 -- | 'enumYear' produces all days in the year starting with /m/
 enumYear :: (Moment a, Ord a) => a -> RecurringSchedule a
 enumYear m = do
-  mi <- asks moment
-  enumPeriodFrom daily{moment = mi} (startDate' mi) endDate
+  i <- ask
+  let mi = moment i
+  enumPeriodFrom (daily `asTypeOf` i){moment = mi} (startDate' mi) endDate
   where
     eoy = if isLeapYear $ dtYear $ toDateTime m then 365 else 366
     endDate = fromJust $ alterYearDay m eoy
@@ -316,8 +317,9 @@ enumYear m = do
 -- | 'enumMonth' produces all days in the current month starting with /m/
 enumMonth :: (Moment a, Ord a) => a -> RecurringSchedule a
 enumMonth m = do
-  mi <- asks moment
-  enumPeriodFrom daily{moment = mi} (startDate' mi) endDate
+  i <- ask
+  let mi = moment i
+  enumPeriodFrom (daily `asTypeOf` i){moment = mi} (startDate' mi) endDate
   where
     dt = toDateTime m
     eom = monthLength (isLeapYear $ dtYear dt) (fromEnum $ dtMonth dt)
@@ -327,12 +329,13 @@ enumMonth m = do
 -- | 'enumWeek' produces all days in the current week starting with /m/
 enumWeek :: (Moment a, Ord a) => a -> RecurringSchedule a
 enumWeek m = do
-  mi <- asks moment
-  sow <- asks startOfWeek
+  i <- ask
+  let mi = moment i
+  let sow = startOfWeek i
   let dt = toDateTime m
   let delta = fromEnum (dtWeekDay dt) - fromEnum (fromStartOfWeek sow)
   let delta' = toInteger delta
-  enumPeriodFrom daily{moment = mi} m (scaleTime m $ (7 - delta') * oneDay) 
+  enumPeriodFrom (daily `asTypeOf` i){moment = mi} m (scaleTime m $ (7 - delta') * oneDay) 
 
 -- | Normalize an bounded index
 --   Pass an upper-bound 'ub' and an index 'idx'
