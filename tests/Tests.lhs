@@ -68,7 +68,7 @@ operate correctly.
 > dayDist (_:[]) = []
 > dayDist (x:xs) = fst $ foldl go ([], utcDay x) xs
 >  where
->    go acc x = let d = utcDay x in (abs (diffDays d (snd acc)):(fst acc), d)
+>    go acc x = let d = utcDay x in (abs (diffDays d (snd acc)):fst acc, d)
 >    utcDay (UTCTime d _) = d
 > checkDayDist :: Integer -> [UTCTime] -> Bool
 > checkDayDist d = all (== d) . dayDist

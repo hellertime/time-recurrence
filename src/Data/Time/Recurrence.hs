@@ -460,7 +460,7 @@ onEach :: (Moment a, Ord a) =>
           (a -> RecurringSchedule a) 
        -> a 
        -> Reader (InitialMoment a) [a]
-onEach f m = f m >>= return . fromSchedule
+onEach f m = fmap fromSchedule (f m)
 
 onEachYear :: (Moment a, Ord a) => a -> Reader (InitialMoment a) [a]
 onEachYear = onEach enumYear
