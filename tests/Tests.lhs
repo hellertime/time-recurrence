@@ -47,14 +47,14 @@ to use.
 >            (take 10 $ repeatSchedule monthlyUTC{moment = date1} $ expand (onMonthDays [2 .. 11]))
 >        , assertEqual ("Test Daily from "++ show date1 ++". Until "++ show date2)
 >            (until date2 $ repeatSchedule' dailyUTC{moment = date1})
->            (until date2 $ repeatSchedule monthlyUTC{moment = date1} $ expand (onDays [Monday .. Sunday]))
+>            (until date2 $ repeatSchedule monthlyUTC{moment = date1} $ expand onEachMonth)
 >        , assertBool ("Test every other day from "++ show date1 ++". Cap at 10000")
 >            (checkDayDist 2 $ take 10000 $ repeatSchedule' dailyUTC{moment = date1, interval = toInterval 2})
 >        , assertEqual ("Test every 10 days from "++ show date1 ++". 5 Occurrences")
 >            (take 5 $ repeatSchedule' dailyUTC{moment = date1, interval = toInterval 10})
 >            (take 5 $ repeatSchedule yearlyUTC{moment = date1} $ expand (onMonths [September,October]) >=> expand (onMonthDays [2,12,22]))
 >        , assertEqual "Test every day in Jan. for 3 years"
->            (until date4 $ repeatSchedule yearlyUTC{moment = date3} $ expand (onMonths [January]) >=> expand (onDays [Monday .. Sunday]))
+>            (until date4 $ repeatSchedule yearlyUTC{moment = date3} $ expand (onMonths [January]) >=> expand onEachMonth)
 >            (until date4 $ repeatSchedule dailyUTC{moment = date3} $ restrict (byMonths [January]))
 >        ]
 >      ]

@@ -46,11 +46,14 @@ module Data.Time.Recurrence
     , byYearDays
 
     , expand
-    , onDays
     , onWeekNumbers
     , onMonths
     , onMonthDays
     , onYearDays
+
+    , onEachWeek
+    , onEachMonth
+    , onEachYear
 
     , repeatSchedule
     , repeatSchedule'
@@ -351,7 +354,7 @@ enumYear m = do
   let mi = moment i
   enumPeriodFrom (daily `asTypeOf` i){moment = mi} (startDate' mi) endDate
   where
-    eoy = if isLeapYear $ dtYear $ toDateTime m then 365 else 366
+    eoy = if isLeapYear $ dtYear $ toDateTime m then 366 else 365
     endDate = fromJust $ alterYearDay m eoy
     startDate' = max (fromJust $ alterYearDay m 1)
 
@@ -453,16 +456,20 @@ on' :: Moment a =>
      -> Reader (InitialMoment a) [a]
 on' f bs a = ask >>= \i -> on (f i) bs a
 
-onDays :: (Moment a, Ord a) => [WeekDay] -> a -> Reader (InitialMoment a) [a]
-onDays ds m = do
-  freq <- asks frequency
-  sched <- go freq >>= restrict (byWeekDays ds) 
-  return $ fromSchedule sched
-  where
-    go Years  = enumYear m
-    go Months = enumMonth m
-    go Weeks  = enumWeek m
-    go _      = return $ Schedule [m]
+onEach :: (Moment a, Ord a) => 
+          (a -> RecurringSchedule a) 
+       -> a 
+       -> Reader (InitialMoment a) [a]
+onEach f m = f m >>= return . fromSchedule
+
+onEachYear :: (Moment a, Ord a) => a -> Reader (InitialMoment a) [a]
+onEachYear = onEach enumYear
+
+onEachMonth :: (Moment a, Ord a) => a -> Reader (InitialMoment a) [a]
+onEachMonth = onEach enumMonth
+
+onEachWeek :: (Moment a, Ord a) => a -> Reader (InitialMoment a) [a]
+onEachWeek = onEach enumWeek
 
 onMonths :: Moment a => [Month] -> a -> Reader (InitialMoment a) [a]
 onMonths = on alterMonth
