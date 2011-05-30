@@ -286,39 +286,49 @@ enumFutureMoments = enumMoments next
 enumPastMoments :: Moment a => RecurringSchedule a
 enumPastMoments = enumMoments prev
 
--- | 'enumPeriod' produces a period of /n/ moments from the 'startDate'.
-enumPeriod :: Moment a => Int -> RecurringSchedule a
-enumPeriod n = do
+-- | 'enumPeriod' produces a period from /beg/ to /end/
+enumPeriod :: Moment a => a -> a -> RecurringSchedule a
+enumPeriod beg end = do
   i <- ask
-  return $ Schedule $ take n $ iterateMoments step (moment i)
+  return $ Schedule $ takeWhile (<= end) $ iterateMoments step beg
   where
     step = next (interval i) (frequency i)
 
--- | 'enumYear' produces a period of /n/ days within the current year
-enumYear :: Moment a => RecurringSchedule a
-enumYear = do
-  i <- ask
-  if isLeapYear $ dtYear $ toDateTime (moment i)
-    then local setPeriod (enumPeriod 365)
-    else local setPeriod (enumPeriod 366)
-  where
-    setPeriod i = let
-      m = moment i
-      startDate' = max (fromJust $ alterYearDay m 1) (startDate i)
-      in i{startDate = startDate', frequency = Days}
+-- | 'enumPeriodFrom' generalizes 'enumPeriod' by allowing an explicit
+-- starting moment
+enumPeriodFrom :: Moment a => 
+                  InitialMoment a
+               -> a
+               -> a
+               -> RecurringSchedule a
+enumPeriodFrom i' beg end = local (const i') (enumPeriod beg end)
 
--- | 'enumMonths' produces a period of /n/ days withing the current month
-enumMonths :: Moment a => RecurringSchedule a
-enumMonths = do
-  i <- ask
-  let dt = toDateTime (moment i)
-  let days = monthLength (isLeapYear $ dtYear dt) (fromEnum $ dtMonth dt)
-  local setPeriod (enumPeriod days)
+-- | 'enumYear' produces all days in the year starting with /m/
+enumYear :: Moment a => a -> RecurringSchedule a
+enumYear m = do
+  mi <- asks moment
+  enumPeriodFrom daily{moment = mi} startDate' fromJust $ alterYearDay m $
+    if isLeapYear $ dtYear $ toDateTime m then 365 else 366
   where
-    setPeriod i = let
-      m = moment i
-      startDate' = max (fromJust $ alterDay m 1) (startDate i)
-      in i{startDate = startDate', frequency = Days}
+    startDate' = max (fromJust $ alterYearDay m 1) mi
+
+-- | 'enumMonth' produces all days in the current month starting with /m/
+enumMonth :: Moment a => a -> RecurringSchedule a
+enumMonth m = do
+  mi <- asks moment
+  let dt = toDateTime m
+  let eom = monthLength (isLeapYear $ dtYear dt) (fromEnum $ dtMonth dt)
+  enumPeriodFrom daily{moment = mi} startDate' fromJust $ alterMonthDay m eom
+  where
+    startDate' = max (fromJust $ alterDay m 1) mi
+
+-- | 'enumWeek' produces all days in the current week starting with /m/
+enumWeek :: Moment a => a -> RecurringSchedule a
+enumWeek m = do
+  mi <- asks moment
+  let dt = toDateTime m
+  let delta = fromEnum (dtWeekDay dt) - fromEnum (asks startOfWeek)
+  enumPeriodFrom daily{moment = mi} m (scaleTime m $ (7 - delta) * oneDay) 
 
 -- | Normalize an bounded index
 --   Pass an upper-bound 'ub' and an index 'idx'
