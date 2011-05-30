@@ -424,8 +424,15 @@ onWeekNumbers ds = on' (alterWeekNumber . startOfWeek) (mapNormIndex 53 ds)
 repeatSchedule :: Moment a => 
                   InitialMoment a 
                -> (Schedule a -> RecurringSchedule a)
-               -> Schedule a
-repeatSchedule init s = runReader (enumFutureMoments >>= s) init
+               -> [a]
+repeatSchedule init s = fromSchedule $ runReader (enumFutureMoments >>= s) init
+
+-- | 'repeatSchedule'' is like 'repeatSchedule' but generated past moments
+repeatSchedule' :: Moment a =>
+                   InitialMoment a
+                -> (Schedule a -> RecurringSchedule a)
+                -> [a]
+repeatSchedule' init s = fromSchedule $ runReader (enumPastMoments >>= s) init
 
 -- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
