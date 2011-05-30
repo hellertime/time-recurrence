@@ -19,7 +19,7 @@ module Data.Time.Recurrence
 import Control.Applicative
 import Control.Monad.Reader
 import Data.List.Ordered (nubSort)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromJust, mapMaybe)
 import Data.Time
 import Data.Time.Calendar.MonthDay (monthLength)
 import Data.Time.Calendar.OrdinalDate (toOrdinalDate, fromOrdinalDateValid, fromMondayStartWeekValid, mondayStartWeek)
@@ -114,7 +114,7 @@ data Frequency
   deriving (Show)
 
 newtype Interval = Interval Integer deriving (Show)
-newtype StartOfWeek = StartOfWeek WeekDay deriving (Show)
+newtype StartOfWeek = StartOfWeek { fromStartOfWeek :: WeekDay } deriving (Show)
 
 toInterval :: Integer -> Interval
 toInterval = Interval
@@ -287,16 +287,16 @@ enumPastMoments :: Moment a => RecurringSchedule a
 enumPastMoments = enumMoments prev
 
 -- | 'enumPeriod' produces a period from /beg/ to /end/
-enumPeriod :: Moment a => a -> a -> RecurringSchedule a
+enumPeriod :: (Moment a, Ord a) => a -> a -> RecurringSchedule a
 enumPeriod beg end = do
   i <- ask
-  return $ Schedule $ takeWhile (<= end) $ iterateMoments step beg
+  return $ Schedule $ takeWhile (<= end) $ iterateMoments (step i) beg
   where
-    step = next (interval i) (frequency i)
+    step i = next (interval i) (frequency i)
 
 -- | 'enumPeriodFrom' generalizes 'enumPeriod' by allowing an explicit
 -- starting moment
-enumPeriodFrom :: Moment a => 
+enumPeriodFrom :: (Moment a, Ord a) => 
                   InitialMoment a
                -> a
                -> a
@@ -304,31 +304,35 @@ enumPeriodFrom :: Moment a =>
 enumPeriodFrom i' beg end = local (const i') (enumPeriod beg end)
 
 -- | 'enumYear' produces all days in the year starting with /m/
-enumYear :: Moment a => a -> RecurringSchedule a
+enumYear :: (Moment a, Ord a) => a -> RecurringSchedule a
 enumYear m = do
   mi <- asks moment
-  enumPeriodFrom daily{moment = mi} startDate' fromJust $ alterYearDay m $
-    if isLeapYear $ dtYear $ toDateTime m then 365 else 366
+  enumPeriodFrom daily{moment = mi} (startDate' mi) endDate
   where
-    startDate' = max (fromJust $ alterYearDay m 1) mi
+    eoy = if isLeapYear $ dtYear $ toDateTime m then 365 else 366
+    endDate = fromJust $ alterYearDay m eoy
+    startDate' = max (fromJust $ alterYearDay m 1)
 
 -- | 'enumMonth' produces all days in the current month starting with /m/
-enumMonth :: Moment a => a -> RecurringSchedule a
+enumMonth :: (Moment a, Ord a) => a -> RecurringSchedule a
 enumMonth m = do
   mi <- asks moment
-  let dt = toDateTime m
-  let eom = monthLength (isLeapYear $ dtYear dt) (fromEnum $ dtMonth dt)
-  enumPeriodFrom daily{moment = mi} startDate' fromJust $ alterMonthDay m eom
+  enumPeriodFrom daily{moment = mi} (startDate' mi) endDate
   where
-    startDate' = max (fromJust $ alterDay m 1) mi
+    dt = toDateTime m
+    eom = monthLength (isLeapYear $ dtYear dt) (fromEnum $ dtMonth dt)
+    endDate = fromJust $ alterDay m eom
+    startDate' = max (fromJust $ alterDay m 1)
 
 -- | 'enumWeek' produces all days in the current week starting with /m/
-enumWeek :: Moment a => a -> RecurringSchedule a
+enumWeek :: (Moment a, Ord a) => a -> RecurringSchedule a
 enumWeek m = do
   mi <- asks moment
+  sow <- asks startOfWeek
   let dt = toDateTime m
-  let delta = fromEnum (dtWeekDay dt) - fromEnum (asks startOfWeek)
-  enumPeriodFrom daily{moment = mi} m (scaleTime m $ (7 - delta) * oneDay) 
+  let delta = fromEnum (dtWeekDay dt) - fromEnum (fromStartOfWeek sow)
+  let delta' = toInteger delta
+  enumPeriodFrom daily{moment = mi} m (scaleTime m $ (7 - delta') * oneDay) 
 
 -- | Normalize an bounded index
 --   Pass an upper-bound 'ub' and an index 'idx'
@@ -412,9 +416,6 @@ onYearDays ds = on alterYearDay (mapNormIndex 366 ds)
 
 onWeekNumbers :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
 onWeekNumbers ds = on' (alterWeekNumber . startOfWeek) (mapNormIndex 53 ds)
-
-onWeekDays :: Moment a -> [WeekDay] -> a -> Reader (InitialMoment a) [a]
-onWeekDays
 
 -- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
