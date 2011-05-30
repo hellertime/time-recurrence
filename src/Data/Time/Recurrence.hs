@@ -1,10 +1,7 @@
 module Data.Time.Recurrence
     (
-      -- * The @DateTime@ type
-      DateTime (..)
-
       -- * The @WeekDay@ type
-    , WeekDay (..)
+      WeekDay (..)
 
       -- * The @Month@ type
     , Month (..)
@@ -12,8 +9,12 @@ module Data.Time.Recurrence
       -- * The @Moment@ type class
     , Moment (..)
 
-      -- * The @RecurrenceParameters@ type
-    , RecurrenceParameters (..)
+      -- * The @InitialMoment@ type
+    , InitialMoment (..)
+
+    , toInterval
+    , toStartOfWeek
+
     , secondly
     , minutely
     , hourly
@@ -22,35 +23,51 @@ module Data.Time.Recurrence
     , monthly
     , yearly
 
-      -- * create types in @RecurrenceParameters@
-    , toInterval
-    , toStartOfWeek
+    , secondlyUTC
+    , minutelyUTC
+    , hourlyUTC
+    , dailyUTC
+    , weeklyUTC
+    , monthlyUTC
+    , yearlyUTC
 
-      -- * Generate list of recurring @Moment@
-    , recur
-    , count
-    , until
+      -- * Recurrence combinators
+    , enumYear
+    , enumMonth
+    , enumWeek
 
-      -- * The @Recurrence@ type
-    , Recurrence (fromRecurrence)
+    , restrict
+    , bySeconds
+    , byMinutes
+    , byHours
+    , byWeekDays
+    , byMonthDays
+    , byMonths
+    , byYearDays
 
-      -- * @Recurrence@ type rule effects
-    , byMonth
-    , byWeekNumber
-    , byYearDay
-    , byMonthDay
-    , byDay 
+    , expand
+    , onWeekNumbers
+    , onMonths
+    , onMonthDays
+    , onYearDays
+
+    , onEachWeek
+    , onEachMonth
+    , onEachYear
+
+    , repeatSchedule
+    , repeatSchedule'
     )
   where
 
-import Prelude hiding (until)
-import Data.Foldable (Foldable, foldMap)
-import Data.List.Ordered (nub, nubSort)
-import Data.Maybe (mapMaybe, fromJust)
-import Data.Monoid
+import Control.Applicative
+import Control.Monad.Reader
+import Data.List.Ordered (nubSort)
+import Data.Maybe (fromJust, mapMaybe)
 import Data.Time
 import Data.Time.Calendar.MonthDay (monthLength)
 import Data.Time.Calendar.OrdinalDate (toOrdinalDate, fromOrdinalDateValid, fromMondayStartWeekValid, mondayStartWeek)
+import Data.Traversable
 
 -- | Symbolic week days.
 --
@@ -141,7 +158,7 @@ data Frequency
   deriving (Show)
 
 newtype Interval = Interval Integer deriving (Show)
-newtype StartOfWeek = StartOfWeek WeekDay deriving (Show)
+newtype StartOfWeek = StartOfWeek { fromStartOfWeek :: WeekDay } deriving (Show)
 
 toInterval :: Integer -> Interval
 toInterval = Interval
@@ -165,39 +182,73 @@ oneDay    = 24 * oneHour
 oneWeek :: Integer
 oneWeek   = 7  * oneDay
 
--- | @Moment@ type class
-class Ord a => Moment a where
-  -- ^ Minimum Definition
+-- | The @Moment@ class is for representing a instance in time.
+--
+-- Instances of @Moment@ can be derived for any user-defined
+-- datatype for which can satisfy the minimal complete definition.
+--
+-- Minimal complete definition: 'epoch', 'toDateTime', 'fromDateTime',
+-- 'scaleTime', 'scaleMonth', 'scaleYear', 'alterWeekNumber',
+-- 'alterYearDay'
+
+class Moment a where
+
+  -- | Provide a default moment.
   epoch           :: a
+
+  -- | Convert a @Moment@ into a @DateTime@
   toDateTime      :: a -> DateTime
+
+  -- | Convert a @DateTime@ into a @Moment@
   fromDateTime    :: DateTime -> Maybe a
+
+  -- | Produce a new @Moment@ offset by a given number of seconds.
   scaleTime       :: a -> Integer -> a
+
+  -- | Produce a new @Moment@ offset by a given number of months.
   scaleMonth      :: a -> Integer -> a
+
+  -- | Produce a new @Moment@ offset by a given number of years.
   scaleYear       :: a -> Integer -> a
 
+  -- | Possibly produce a new @Moment@ shifted to a different week of the year.
   alterWeekNumber :: StartOfWeek -> a -> Int -> Maybe a
+
+  -- | Possibly produce a new @Moment@ shifted to a different day of the year.
   alterYearDay    :: a -> Int -> Maybe a
 
-  -- ^ Other Methods
+  -- | The 'alter*' methods can potentially produce invalid dates.
+  -- 
+  -- For each user-defined @Moment@ instance the definitions of
+  -- 'toDateTime', 'fromDateTime', 'alterWeekNumber' and 'alterYearDay' 
+  -- will determine if an altered @Moment@ that lands on an invalid date
+  -- in the given calendar will be reduced to @Nothing@
 
+  -- | Possibly produce a new @Moment@ shifted to a different second of the day.
   alterSecond     :: a -> Int -> Maybe a
   alterSecond x s = fromDateTime (toDateTime x){dtSecond = s}
 
+  -- | Possibly produce a new @Moment@ shifted to a different minute of the day.
   alterMinute     :: a -> Int -> Maybe a
   alterMinute x m = fromDateTime (toDateTime x){dtMinute = m}
 
+  -- | Possibly produce a new @Moment@ shifted to a different hour of the day.
   alterHour       :: a -> Int -> Maybe a
   alterHour x h = fromDateTime (toDateTime x){dtHour = h}
 
+  -- | Possibly produce a new @Moment@ shifted to a different day of the month.
   alterDay        :: a -> Int -> Maybe a
   alterDay x d = fromDateTime (toDateTime x){dtDay = d}
 
+  -- | Possibly produce a new @Moment@ shifted to a different month of the year.
   alterMonth      :: a -> Month -> Maybe a
   alterMonth x m = fromDateTime (toDateTime x){dtMonth = m}
 
+  -- | Possibly produce a new @Moment@ shifted to a different year.
   alterYear       :: a -> Integer -> Maybe a
   alterYear x y = fromDateTime (toDateTime x){dtYear = y}
 
+  -- | Produce a new @Moment@ in the future ocurring at (/interval/ * /freq/)
   next :: Interval -> Frequency -> a -> a
   next (Interval interval) freq =
     case freq of
@@ -211,8 +262,241 @@ class Ord a => Moment a where
     where
       scale x = flip scaleTime (interval * x)
 
+  -- | Produce a new @Moment@ in the past ocurring at (-/interval/ * /freq/)
   prev :: Interval -> Frequency -> a -> a
   prev (Interval interval) = next $ Interval (-interval)
+
+-- | The @InitialMoment@ datatype
+
+data InitialMoment a = InitialMoment
+    { frequency   :: Frequency
+    , interval    :: Interval
+    , startOfWeek :: StartOfWeek
+    , moment      :: a
+    }
+  deriving (Show)
+
+mkIM :: Moment a => Frequency -> InitialMoment a
+mkIM f = InitialMoment f (toInterval 1) (StartOfWeek Monday) epoch
+
+-- | Default initial moments
+
+secondly :: Moment a => InitialMoment a
+secondly = mkIM Seconds
+
+minutely :: Moment a => InitialMoment a
+minutely = mkIM Minutes
+
+hourly :: Moment a => InitialMoment a
+hourly = mkIM Hours
+
+daily :: Moment a => InitialMoment a
+daily = mkIM Days
+
+weekly :: Moment a => InitialMoment a
+weekly = mkIM Weeks
+
+monthly :: Moment a => InitialMoment a
+monthly = mkIM Months
+
+yearly :: Moment a => InitialMoment a
+yearly = mkIM Years
+
+-- | The @Schedule@ datatype
+
+newtype Schedule a = Schedule {fromSchedule :: [a]} deriving (Show, Eq, Ord)
+
+-- | Produce an infinite list from an initial @Moment@ and a step function.
+iterateMoments :: Moment a => (a -> a) -> a -> [a]
+iterateMoments = iterate
+
+type RecurringSchedule a = Reader (InitialMoment a) (Schedule a)
+
+enumMoments :: Moment a => 
+               (Interval -> Frequency -> a -> a) 
+            -> RecurringSchedule a
+enumMoments step = do
+  i <- ask
+  return $ Schedule $ iterateMoments (step' i) (moment i)
+  where
+    step' i = step (interval i) (frequency i)
+
+-- | 'enumFutureMoments' is a @Schedule@ of all future moments derived
+-- from the @InitialMoment@
+enumFutureMoments :: Moment a => RecurringSchedule a
+enumFutureMoments = enumMoments next
+
+-- | 'enumPastMoments' goes in the opposite direction of 'enumFutureMoments'
+enumPastMoments :: Moment a => RecurringSchedule a
+enumPastMoments = enumMoments prev
+
+-- | 'enumPeriod' produces a period from /beg/ to /end/
+enumPeriod :: (Moment a, Ord a) => a -> a -> RecurringSchedule a
+enumPeriod beg end = do
+  i <- ask
+  return $ Schedule $ takeWhile (<= end) $ iterateMoments (step i) beg
+  where
+    step i = next (interval i) (frequency i)
+
+-- | 'enumPeriodFrom' generalizes 'enumPeriod' by allowing an explicit
+-- starting moment
+enumPeriodFrom :: (Moment a, Ord a) => 
+                  InitialMoment a
+               -> a
+               -> a
+               -> RecurringSchedule a
+enumPeriodFrom i' beg end = local (const i') (enumPeriod beg end)
+
+-- | 'enumYear' produces all days in the year starting with /m/
+enumYear :: (Moment a, Ord a) => a -> RecurringSchedule a
+enumYear m = do
+  i <- ask
+  let mi = moment i
+  enumPeriodFrom (daily `asTypeOf` i){moment = mi} (startDate' mi) endDate
+  where
+    eoy = if isLeapYear $ dtYear $ toDateTime m then 366 else 365
+    endDate = fromJust $ alterYearDay m eoy
+    startDate' = max (fromJust $ alterYearDay m 1)
+
+-- | 'enumMonth' produces all days in the current month starting with /m/
+enumMonth :: (Moment a, Ord a) => a -> RecurringSchedule a
+enumMonth m = do
+  i <- ask
+  let mi = moment i
+  enumPeriodFrom (daily `asTypeOf` i){moment = mi} (startDate' mi) endDate
+  where
+    dt = toDateTime m
+    eom = monthLength (isLeapYear $ dtYear dt) (fromEnum $ dtMonth dt)
+    endDate = fromJust $ alterDay m eom
+    startDate' = max (fromJust $ alterDay m 1)
+
+-- | 'enumWeek' produces all days in the current week starting with /m/
+enumWeek :: (Moment a, Ord a) => a -> RecurringSchedule a
+enumWeek m = do
+  i <- ask
+  let mi = moment i
+  let sow = startOfWeek i
+  let dt = toDateTime m
+  let delta = fromEnum (dtWeekDay dt) - fromEnum (fromStartOfWeek sow)
+  let delta' = toInteger delta
+  let endDate = scaleTime m $ (7 - delta') * oneDay
+  enumPeriodFrom (daily `asTypeOf` i){moment = mi} m endDate
+
+-- | Normalize an bounded index
+--   Pass an upper-bound 'ub' and an index 'idx'
+--   Converts 'idx' < 0 into valid 'idx' > 0 or
+--   Nothing
+normIndex :: Int -> Int -> Maybe Int
+normIndex _ 0 = Nothing
+normIndex ub idx =
+  if abs idx > ub
+    then Nothing
+    else Just $ (idx + ub') `mod` ub'
+  where
+    ub' = ub + 1
+
+mapNormIndex :: Int -> [Int] -> [Int]
+mapNormIndex n = mapMaybe (normIndex n)
+
+-- | 'restrict', applied to a predicate and a @Schedule@, returns a @Schedule@
+-- of those moments that statisfy the predicate.
+restrict :: Moment a => (a -> Bool) -> Schedule a -> RecurringSchedule a
+restrict f s = return $ Schedule $ filter f $ fromSchedule s
+
+by :: (Moment a, Ord b) => (DateTime -> b) -> [b] -> a -> Bool
+by f bs a = f (toDateTime a) `elem` nubSort bs
+
+by' :: Moment a => (DateTime -> Int) -> Int -> [Int] -> a -> Bool
+by' f n bs = by f $ mapNormIndex n bs
+
+bySeconds :: Moment a => [Int] -> a -> Bool
+bySeconds = by dtSecond
+
+byMinutes :: Moment a => [Int] -> a -> Bool
+byMinutes = by dtMinute
+
+byHours :: Moment a => [Int] -> a -> Bool
+byHours = by dtHour
+
+byWeekDays :: Moment a => [WeekDay] -> a -> Bool
+byWeekDays = by dtWeekDay
+
+byMonthDays :: Moment a => [Int] -> a -> Bool
+byMonthDays = by' dtDay 31
+
+byMonths :: Moment a => [Month] -> a -> Bool
+byMonths = by dtMonth
+
+byYearDays :: Moment a => [Int] -> a -> Bool
+byYearDays = by' dtYearDay 366
+
+-- monadic concatMap
+concatMapM :: Applicative m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f xs = concat <$> traverse f xs
+
+-- | 'expand', takes an expansion function and a @Schedule@, and maps the
+-- expansion function over the moments.
+-- Each moment is then replaced with its expansions.
+expand :: Moment a => (a -> Reader (InitialMoment a) [a]) -> Schedule a -> RecurringSchedule a
+expand f s = do
+  xs <- concatMapM f (fromSchedule s)
+  return $ Schedule xs
+
+on :: Moment a => 
+      (a -> b -> Maybe a) 
+   -> [b] 
+   -> a 
+   -> Reader (InitialMoment a) [a]
+on f bs a = return $ mapMaybe (f a) bs
+
+on' :: Moment a =>
+       (InitialMoment a -> a -> b -> Maybe a)
+     -> [b]
+     -> a
+     -> Reader (InitialMoment a) [a]
+on' f bs a = ask >>= \i -> on (f i) bs a
+
+onEach :: (Moment a, Ord a) => 
+          (a -> RecurringSchedule a) 
+       -> a 
+       -> Reader (InitialMoment a) [a]
+onEach f m = fmap fromSchedule (f m)
+
+onEachYear :: (Moment a, Ord a) => a -> Reader (InitialMoment a) [a]
+onEachYear = onEach enumYear
+
+onEachMonth :: (Moment a, Ord a) => a -> Reader (InitialMoment a) [a]
+onEachMonth = onEach enumMonth
+
+onEachWeek :: (Moment a, Ord a) => a -> Reader (InitialMoment a) [a]
+onEachWeek = onEach enumWeek
+
+onMonths :: Moment a => [Month] -> a -> Reader (InitialMoment a) [a]
+onMonths = on alterMonth
+
+onMonthDays :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
+onMonthDays ds = on alterDay (mapNormIndex 31 ds)
+
+onYearDays :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
+onYearDays ds = on alterYearDay (mapNormIndex 366 ds)
+
+onWeekNumbers :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
+onWeekNumbers ds = on' (alterWeekNumber . startOfWeek) (mapNormIndex 53 ds)
+
+-- | 'repeatSchedule' runs a schedule with a given /init/ and rule /r/
+repeatSchedule :: Moment a => 
+                  InitialMoment a 
+               -> (Schedule a -> RecurringSchedule a)
+               -> [a]
+repeatSchedule init r = fromSchedule $ runReader (enumFutureMoments >>= r) init
+
+-- | 'repeatSchedule'' is like 'repeatSchedule' but it takes no rules
+repeatSchedule' :: Moment a =>
+                   InitialMoment a
+                -> [a]
+repeatSchedule' init = repeatSchedule init return
+
+-- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
 instance Moment UTCTime where
   epoch = UTCTime (toEnum 0) 0
@@ -247,166 +531,25 @@ instance Moment UTCTime where
     day <- fromOrdinalDateValid (dtYear dt) yearDay
     return $ UTCTime day time
 
--- | The @RecurrenceParameters@ type
-data RecurrenceParameters a = RecurrenceParameters
-    { interval    :: Interval
-    , frequency   :: Frequency
-    , startOfWeek :: StartOfWeek
-    , startDate   :: a
-    }
-  deriving (Show)
+-- | @InitialMoment@ defaults for @UTCTime@
 
-mkRP :: Moment a => Frequency -> RecurrenceParameters a
-mkRP f = RecurrenceParameters (Interval 1) f (StartOfWeek Monday) epoch
+secondlyUTC :: InitialMoment UTCTime
+secondlyUTC = secondly
 
--- | Some common recurrence parameters
-secondly :: Moment a => RecurrenceParameters a -- ^ Recur every second
-secondly = mkRP Seconds
+minutelyUTC :: InitialMoment UTCTime
+minutelyUTC = minutely
 
-minutely :: Moment a => RecurrenceParameters a -- ^ Recur every minute
-minutely = mkRP Minutes
+hourlyUTC :: InitialMoment UTCTime
+hourlyUTC = hourly
 
-hourly :: Moment a => RecurrenceParameters a   -- ^ Recur every hour
-hourly = mkRP Hours
+dailyUTC :: InitialMoment UTCTime
+dailyUTC = daily
 
-daily :: Moment a => RecurrenceParameters a   -- ^ Recur every day
-daily = mkRP Days
+weeklyUTC :: InitialMoment UTCTime
+weeklyUTC = weekly
 
-weekly :: Moment a => RecurrenceParameters a   -- ^ Recur every week
-weekly = mkRP Weeks
+monthlyUTC :: InitialMoment UTCTime
+monthlyUTC = monthly
 
-monthly :: Moment a => RecurrenceParameters a -- ^ Recur every month
-monthly = mkRP Months
-
-yearly :: Moment a => RecurrenceParameters a  -- ^ Recur every year
-yearly = mkRP Years
-
--- | The @Recurrence@ type
---   a @Recurrence@ is on or more @Moment@s
-newtype Recurrence a = Recurrence { fromRecurrence :: [a] } deriving (Show, Ord, Eq)
-
-instance Monoid (Recurrence a) where
-  mempty = Recurrence []
-  mappend (Recurrence xs) (Recurrence ys) = Recurrence (xs ++ ys)
-
-instance Foldable Recurrence where
-  foldMap f (Recurrence r) = mconcat $ map f r
-
-liftR :: Moment a => ([a] -> [a]) -> Recurrence a -> Recurrence a
-liftR f (Recurrence r) = Recurrence $ f r
-
-mkR :: Moment a => a -> Recurrence a
-mkR x = Recurrence [x]
-
-recur :: Moment a => 
-         [RecurrenceParameters a 
-         -> a 
-         -> Recurrence a]                  -- ^ Sub Rules on Moments
-      -> RecurrenceParameters a            -- ^ Parameters of the recurrence
-      -> Recurrence a                      -- ^ Resulting @Recurrence@
-recur subRules params = liftR nub $ applySubRules $ recur' (startDate params)
-  where
-    subRules' = map ($ params) subRules
-    go = next (interval params) (frequency params) 
-    recur' = Recurrence . iterate go
-    fapply fs xs = foldl (\xs' f -> f xs') xs fs
-    applySubRules = fapply $ map foldMap subRules'
-
--- | Limit recurrence results to a count
-count :: Moment a => Int -> Recurrence a -> Recurrence a
-count = liftR . take
-
-
--- | Limit recurrence results to a max date
-until :: Moment a => a -> Recurrence a -> Recurrence a
-until m = liftR $ takeWhile (<= m)
-
--- | Generate all days within the frequency
---   Yearly generates all days in the year
---   Monthly all days in the month of that year
---   Weekly all days in the week of that month of that year,
---   starting on the first day of the week
-moments :: Moment a => RecurrenceParameters a -> a -> Recurrence a
-moments params = go (frequency params)
-  where
-    go Years x =
-      if isLeapYear $ dtYear $ toDateTime x
-        then liftR (take 366) $ recur [] params'
-        else liftR (take 365) $ recur [] params'
-      where
-        params' = params{startDate = startDate', frequency = Days}
-        startDate' = max (fromJust $ alterYearDay x 1) (startDate params)
-    go Months x = liftR (take days) $ recur [] params'
-      where
-        dt = toDateTime x
-        days = monthLength (isLeapYear (dtYear dt)) (fromEnum $ dtMonth dt)
-        params' = params{startDate = startDate', frequency = Days}
-        startDate' = max (fromJust $ alterDay x 1) (startDate params)
-    go Weeks x = liftR (take 7) $ recur [] params'
-      where
-        dt = toDateTime x
-        delta = fromEnum (dtWeekDay dt) - fromEnum Monday
-        params' = params{startDate = startDate', frequency = Days}
-        yearDay' = dtYearDay dt - delta
-        startDate' = max (fromJust $ alterYearDay x yearDay') (startDate params)
-    go _     x = mkR x
-
--- | Normalize an bounded index
---   Pass an upper-bound 'ub' and an index 'idx'
---   Converts 'idx' < 0 into valid 'idx' > 0 or
---   Nothing
-normIndex :: Int -> Int -> Maybe Int
-normIndex _ 0 = Nothing
-normIndex ub idx =
-  if abs idx > ub
-    then Nothing
-    else Just $ (idx + ub') `mod` ub'
-  where
-    ub' = ub + 1
-
-byMonth :: Moment a => [Month] -> RecurrenceParameters a -> a -> Recurrence a
-byMonth months params = go (frequency params) months
-  where
-    go Years mts x = Recurrence $ mapMaybe (alterMonth x) mts
-    go _     mts x = Recurrence [x | dtMonth (toDateTime x) `elem` mts]
-
-byWeekNumber :: Moment a => [Int] -> RecurrenceParameters a -> a -> Recurrence a 
-byWeekNumber weeks params = go (frequency params) weeks'
-  where
-    sow = startOfWeek params
-    go Years wks x = Recurrence $ mapMaybe (alterWeekNumber sow x) wks
-    go _     _   x = mkR x
-    weeks' = nubSort $ mapMaybe (normIndex 53) weeks
-
-byYearDay :: Moment a => [Int] -> RecurrenceParameters a -> a -> Recurrence a
-byYearDay days params = go (frequency params) days'
-  where
-    days' = nubSort $ mapMaybe (normIndex 366) days
-    go Seconds ds x = Recurrence [x | dtYearDay (toDateTime x) `elem` ds]
-    go Minutes ds x = Recurrence [x | dtYearDay (toDateTime x) `elem` ds]
-    go Hours   ds x = Recurrence [x | dtYearDay (toDateTime x) `elem` ds]
-    go Days    _  x = mkR x
-    go Weeks   _  x = mkR x
-    go Months  _  x = mkR x
-    go Years ds x = Recurrence $ mapMaybe (alterYearDay x) ds
-
-byMonthDay :: Moment a => [Int] -> RecurrenceParameters a -> a -> Recurrence a
-byMonthDay days params = go (frequency params) days'
-  where
-    days' = nubSort $ mapMaybe (normIndex 31) days
-    go Seconds ds x = Recurrence [x | dtDay (toDateTime x) `elem` ds]
-    go Minutes ds x = Recurrence [x | dtDay (toDateTime x) `elem` ds]
-    go Hours   ds x = Recurrence [x | dtDay (toDateTime x) `elem` ds]
-    go Days    ds x = Recurrence [x | dtDay (toDateTime x) `elem` ds]
-    go _       ds x = Recurrence $ mapMaybe (alterDay x) ds
-
-byDay :: Moment a => [WeekDay] -> RecurrenceParameters a -> a -> Recurrence a
-byDay days params = go (frequency params) days
-  where
-   go Seconds ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
-   go Minutes ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
-   go Hours   ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
-   go Days    ds x = Recurrence [x | dtWeekDay (toDateTime x) `elem` ds]
-   go _       ds x = Recurrence $ filter (onDays ds) $ (\(Recurrence xs) -> xs) $ moments params x
-     where
-       onDays ds x = dtWeekDay (toDateTime x) `elem` ds
+yearlyUTC :: InitialMoment UTCTime
+yearlyUTC = yearly

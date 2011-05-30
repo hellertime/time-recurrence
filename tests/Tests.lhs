@@ -18,6 +18,7 @@ into UTC.
 > import Data.Maybe (fromJust)
 
 > import Prelude hiding (until)
+> import Control.Monad ((>=>))
 > import Data.Time.Recurrence
 
 We are certain of the validity of the dates used, and so fromJust is safe
@@ -35,33 +36,26 @@ to use.
 > main :: IO ()
 > main = defaultMain tests
 
-We must provide type-qualified versions of the initializers for the
-Moment type used (UTCTime)
-
-> dailyUTC :: RecurrenceParameters UTCTime
-> dailyUTC = daily
-> monthlyUTC :: RecurrenceParameters UTCTime
-> monthlyUTC = monthly
-> yearlyUTC :: RecurrenceParameters UTCTime
-> yearlyUTC = yearly
+> until :: (Moment a, Ord a) => a -> [a] -> [a]
+> until m = takeWhile (<= m)
 
 > tests :: [Test]
 > tests = 
 >      [ testGroup "RFC5445 Examples" $ zipWith (testCase . show) [1::Int ..]
 >        [ assertEqual ("Test Daily from "++ show date1 ++". 10 Occurrences") 
->            (count 10 $ recur [] dailyUTC{startDate = date1})
->            (count 10 $ recur [byMonthDay [2 .. 11]] monthlyUTC{startDate = date1})
+>            (take 10 $ repeatSchedule' dailyUTC{moment = date1})
+>            (take 10 $ repeatSchedule monthlyUTC{moment = date1} $ expand (onMonthDays [2 .. 11]))
 >        , assertEqual ("Test Daily from "++ show date1 ++". Until "++ show date2)
->            (until date2 $ recur [] dailyUTC{startDate = date1})
->            (until date2 $ recur [byDay [Monday .. Sunday]] monthlyUTC{startDate = date1})
+>            (until date2 $ repeatSchedule' dailyUTC{moment = date1})
+>            (until date2 $ repeatSchedule monthlyUTC{moment = date1} $ expand onEachMonth)
 >        , assertBool ("Test every other day from "++ show date1 ++". Cap at 10000")
->            (checkDayDist 2 $ count 10000 $ recur [] dailyUTC{startDate = date1, interval = toInterval 2})
+>            (checkDayDist 2 $ take 10000 $ repeatSchedule' dailyUTC{moment = date1, interval = toInterval 2})
 >        , assertEqual ("Test every 10 days from "++ show date1 ++". 5 Occurrences")
->            (count 5 $ recur [] dailyUTC{startDate = date1, interval = toInterval 10})
->            (count 5 $ recur [byMonth [September,October], byMonthDay [2,12,22]] yearlyUTC{startDate = date1})
+>            (take 5 $ repeatSchedule' dailyUTC{moment = date1, interval = toInterval 10})
+>            (take 5 $ repeatSchedule yearlyUTC{moment = date1} $ expand (onMonths [September,October]) >=> expand (onMonthDays [2,12,22]))
 >        , assertEqual "Test every day in Jan. for 3 years"
->            (until date4 $ recur [byMonth [January], byDay [Monday .. Sunday]] yearlyUTC{startDate = date3})
->            (until date4 $ recur [byMonth [January]] dailyUTC{startDate = date3})
+>            (until date4 $ repeatSchedule yearlyUTC{moment = date3} $ expand (onMonths [January]) >=> expand onEachMonth)
+>            (until date4 $ repeatSchedule dailyUTC{moment = date3} $ restrict (byMonths [January]))
 >        ]
 >      ]
 
@@ -74,7 +68,7 @@ operate correctly.
 > dayDist (_:[]) = []
 > dayDist (x:xs) = fst $ foldl go ([], utcDay x) xs
 >  where
->    go acc x = let d = utcDay x in (abs (diffDays d (snd acc)):(fst acc), d)
+>    go acc x = let d = utcDay x in (abs (diffDays d (snd acc)):fst acc, d)
 >    utcDay (UTCTime d _) = d
-> checkDayDist :: Integer -> Recurrence UTCTime -> Bool
-> checkDayDist d rs = all (== d) $ dayDist $ fromRecurrence rs
+> checkDayDist :: Integer -> [UTCTime] -> Bool
+> checkDayDist d = all (== d) . dayDist
