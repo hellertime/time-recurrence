@@ -12,7 +12,6 @@ module Data.Time.Recurrence
       -- * create types in @RecurrenceParameters@
     , toInterval
     , toStartOfWeek
-
     )
   where
 
@@ -335,7 +334,8 @@ enumWeek m = do
   let dt = toDateTime m
   let delta = fromEnum (dtWeekDay dt) - fromEnum (fromStartOfWeek sow)
   let delta' = toInteger delta
-  enumPeriodFrom (daily `asTypeOf` i){moment = mi} m (scaleTime m $ (7 - delta') * oneDay) 
+  let endDate = scaleTime m $ (7 - delta') * oneDay
+  enumPeriodFrom (daily `asTypeOf` i){moment = mi} m endDate
 
 -- | Normalize an bounded index
 --   Pass an upper-bound 'ub' and an index 'idx'
@@ -419,6 +419,13 @@ onYearDays ds = on alterYearDay (mapNormIndex 366 ds)
 
 onWeekNumbers :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
 onWeekNumbers ds = on' (alterWeekNumber . startOfWeek) (mapNormIndex 53 ds)
+
+-- | 'repeatSchedule' runs a schedule with a given /init/
+repeatSchedule :: Moment a => 
+                  InitialMoment a 
+               -> (Schedule a -> RecurringSchedule a)
+               -> Schedule a
+repeatSchedule init s = flip runReader init (enumFutureMoments >>= s)
 
 -- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
