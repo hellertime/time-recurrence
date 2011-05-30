@@ -46,8 +46,10 @@ module Data.Time.Recurrence
     , byYearDays
 
     , expand
+    , onDays
     , onWeekNumbers
     , onMonths
+    , onMonthDays
     , onYearDays
 
     , repeatSchedule
@@ -451,8 +453,22 @@ on' :: Moment a =>
      -> Reader (InitialMoment a) [a]
 on' f bs a = ask >>= \i -> on (f i) bs a
 
+onDays :: (Moment a, Ord a) => [WeekDay] -> a -> Reader (InitialMoment a) [a]
+onDays ds m = do
+  freq <- asks frequency
+  sched <- go freq >>= restrict (byWeekDays ds) 
+  return $ fromSchedule sched
+  where
+    go Years  = enumYear m
+    go Months = enumMonth m
+    go Weeks  = enumWeek m
+    go _      = return $ Schedule [m]
+
 onMonths :: Moment a => [Month] -> a -> Reader (InitialMoment a) [a]
 onMonths = on alterMonth
+
+onMonthDays :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
+onMonthDays ds = on alterDay (mapNormIndex 31 ds)
 
 onYearDays :: Moment a => [Int] -> a -> Reader (InitialMoment a) [a]
 onYearDays ds = on alterYearDay (mapNormIndex 366 ds)
