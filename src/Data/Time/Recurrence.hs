@@ -425,7 +425,7 @@ repeatSchedule :: Moment a =>
                   InitialMoment a 
                -> (Schedule a -> RecurringSchedule a)
                -> Schedule a
-repeatSchedule init s = flip runReader init (enumFutureMoments >>= s)
+repeatSchedule init s = runReader (enumFutureMoments >>= s) init
 
 -- | Instance of the @Moment@ class defined for the @UTCTime@ datatype.
 
