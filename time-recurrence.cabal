@@ -7,7 +7,7 @@ Name:                time-recurrence
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.4.1
+Version:             0.4.2
 
 -- A short (one-line) description of the package.
 Synopsis:            Generate recurring dates.
@@ -72,6 +72,7 @@ Library
                        data-ordlist >= 0.4 && < 0.4.5,
                        mtl >= 2.0.1.0 && < 2.1
   
+  Default-Language:    Haskell98
   -- Modules not exported by this package.
   -- Other-modules:       
   
@@ -90,3 +91,4 @@ Test-Suite test-time-recurrence
                         old-locale >= 1.0.0.2 && < 1.1
   other-modules:
     Data.Time.Recurrence
+  default-language:     Haskell98
