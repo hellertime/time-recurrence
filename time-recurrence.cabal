@@ -44,7 +44,7 @@ Category:            System
 Build-type:          Simple
 
 -- Constraint on the version of Cabal needed to build this package.
-Cabal-version:       >=1.6
+Cabal-version:       >=1.10
 
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
