@@ -9,6 +9,9 @@ module Data.Time.Recurrence
       -- * The @Moment@ type class
     , Moment (..)
 
+      -- * The @DateTime@ type class
+    , DateTime (..)
+
       -- * The @InitialMoment@ type
     , InitialMoment (..)
 
