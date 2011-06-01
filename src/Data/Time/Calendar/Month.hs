@@ -1,7 +1,7 @@
 module Data.Time.Calendar.Month
     (
       -- * Month
-      Month(..)
+      Month (..)
     ) 
   where
 

@@ -1,22 +1,19 @@
 module Data.Time.CalendarTime.CalendarTime
     (
       -- * Calendar Time
-      CalendarTime(..)
+      CalendarTime (..)
     , toDay
     , toTimeOfDay
+
+      -- * Calendar Time Convertible
+    , CalendarTimeConvertible (..)
     ) 
   where
 
+import Data.Time
 import Data.Time.Calendar.OrdinalDate
-import Data.Time.Calendar.Gregorian
-import Data.Time.Calendar.Days
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
-import Data.Time.Calendar.Private
-import Data.Time.Clock
-import Data.Time.LocalTime.LocalTime
-import Data.Time.LocalTime.TimeOfDay
-import Data.Time.LocalTime.TimeZone
 import System.IO.Unsafe
 
 -- | A representation of calendar time separated into year, month, day, and so on.
@@ -32,9 +29,6 @@ data CalendarTime = CalendarTime
     , calendarYearDay  :: Int
     , calendarTimeZone :: TimeZone
 } deriving (Eq,Ord)
-
-instance Show CalendarTime where
-  show = show . fromCalendarTime
 
 -- | The class of types which can be converted to a 'CalendarTime'
 class CalendarTimeConvertible t where

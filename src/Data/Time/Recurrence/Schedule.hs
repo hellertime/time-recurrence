@@ -1,26 +1,51 @@
+-- This module is intended to be imported @qualified!, to avoid name
+-- clashes with "Prelude" functions. eg.
+--
+-- > import qualified Data.Time.Recurrence.Schedule as S
 module Data.Time.Recurrence.Schedule
     (
-      Schedule (fromSchedule)
+      Schedule -- abstract, instances: Eq, Ord, Show
+    , toList
+
+      -- * Reducing 'Schedule's (folds)
+    , foldl
+
+      -- * Generating 'Schedule's
+    , unfoldr
+    , iterate
+
+      -- * Transforming 'Schedule's
+    , map
+
+      -- * Searching with a predicate
+    , filter
+
+      -- * predicate builders
+    , by
+    , by'
     )
   where
 
+import Prelude hiding (filter, map, foldl, iterate)
 import Control.Monad.Reader
-import Data.Foldable
 import qualified Data.List as L
+import Data.List.Ordered (nubSort)
 import Data.Monoid
+import Data.Time.CalendarTime
 import Data.Time.Moment
+import Data.Time.Recurrence.Private
 
-newtype Schedule a = Schedule { fromSchedule :: [a] }
+newtype Schedule a = Schedule { fromSchedule :: [a] } deriving (Show, Eq, Ord)
+
+toList :: Schedule a -> [a]
+toList = fromSchedule
 
 instance Monoid (Schedule a) where
   mempty = Schedule []
   x `mappend` y = Schedule $ (fromSchedule x) ++ (fromSchedule y)
 
-instance Functor Schedule where
-  fmap f = Schedule . map f . fromSchedule
-
-instance Foldable Schedule where
-  foldr f b sch = (L.foldr f b $ fromSchedule sch)
+-- ----------------------------------------------------------------------------
+-- Unfolds
 
 -- | The 'unfoldr' function is analogous to the List 'unfoldr'. 
 -- 'unfoldr' builds a 'Schedule' from a seed value. The function takes the 
@@ -47,3 +72,46 @@ iterate ::
 iterate f = asks moment 
             >>= unfoldr (\x -> f x 
                                >>= \x' -> return $ Just (Schedule [x'], x'))
+
+foldl :: 
+  (a -> a -> Reader (InitialMoment a) a)
+  -> a
+  -> Schedule a
+  -> Reader (InitialMoment a) (Schedule a)
+foldl f a s = go a (fromSchedule s)
+  where
+   go a' []     = return $ Schedule [a']
+   go a' (x:xs) = f a' x >>= \a'' -> go a'' xs
+
+filter ::
+  (a -> Reader (InitialMoment a) Bool)
+  -> Schedule a
+  -> Reader (InitialMoment a) (Schedule a)
+filter p sch = filterM p (fromSchedule sch) >>= return . Schedule
+
+--
+-- Useful predicates to 'filter'
+
+-- | Predicate builder
+by :: 
+  (CalendarTimeConvertible a, Ord b) => 
+  (CalendarTime -> b) 
+  -> [b] 
+  -> a 
+  -> Reader (InitialMoment a) Bool
+by f bs a = return $ f (toCalendarTime a) `elem` nubSort bs
+
+by' :: 
+  (CalendarTimeConvertible a) => 
+  (CalendarTime -> Int) 
+  -> Int 
+  -> [Int] 
+  -> a 
+  -> Reader (InitialMoment a) Bool
+by' f n bs = by f $ mapNormIndex n bs
+
+map ::
+  (a -> Reader (InitialMoment a) a)
+  -> Schedule a
+  -> Reader (InitialMoment a) (Schedule a)
+map f s = mapM f (fromSchedule s) >>= return . Schedule
