@@ -22,12 +22,12 @@ instance Functor Schedule where
 instance Foldable Schedule where
   foldr f b sch = (L.foldr f b $ fromSchedule sch)
 
--- | /O(n)/, where @n@ is the length of the result. The 'unfoldr' function 
--- is analogous to the List 'unfoldr'. 'unfoldr' builds a 'Schedule' from a 
--- seed value. The function takes the element and returns 'Nothing' if it is
--- done producing the 'Schedule', otherwise 'Just' @(a, b)@. In this case, @a@
--- is a 'Schedule' to which further output is appended to and b is used as the
--- next seed in a recursive call
+-- | The 'unfoldr' function is analogous to the List 'unfoldr'. 
+-- 'unfoldr' builds a 'Schedule' from a seed value. The function takes the 
+-- element and returns 'Nothing' if it is done producing the 'Schedule', 
+-- otherwise 'Just' @(a, b)@. In this case, @a@ is a 'Schedule' to which 
+-- further output is appended to and b is used as the next seed in a 
+-- recursive call
 unfoldr :: 
   (a -> Reader (InitialMoment a) (Maybe (Schedule a, a))) -- ^ builder function
   -> a -- ^ seed value
@@ -38,3 +38,12 @@ unfoldr f b = do
     Just (a, new_b) -> unfoldr f new_b 
                        >>= \b -> return $ a `mappend` b
     Nothing         -> return mempty
+
+-- | 'iterate' returns an ininite 'Schedule' of repeated applications of 'f' on
+-- the 'Reader'
+iterate ::
+  (a -> Reader (InitialMoment a) a)
+  -> Reader (InitialMoment a) (Schedule a)
+iterate f = asks moment 
+            >>= unfoldr (\x -> f x 
+                               >>= \x' -> return $ Just (Schedule [x'], x'))
