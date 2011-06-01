@@ -25,6 +25,23 @@ module Data.Time.Moment.Moment
     )
   where
 
+import Data.Time.Calendar.WeekDay
+
+oneSecond :: Integer
+oneSecond = 1
+
+oneMinute :: Integer
+oneMinute = 60 * oneSecond
+
+oneHour :: Integer
+oneHour   = 60 * oneMinute
+
+oneDay :: Integer
+oneDay    = 24 * oneHour
+
+oneWeek :: Integer
+oneWeek   = 7  * oneDay
+
 -- | The @Moment@ class is for representing a instance in time.
 --
 -- Instances of @Moment@ can be derived for any user-defined
@@ -51,7 +68,7 @@ class Moment a where
       Months  -> flip addMonths interval
       Years   -> flip addYears interval
     where
-      scale x = flip addSeconds (interval * x)
+      add x = flip addSeconds (interval * x)
 
   -- | Produce a new @Moment@ in the past ocurring at (-/interval/ * /freq/)
   prev :: Interval -> Frequency -> a -> a
@@ -113,7 +130,7 @@ newtype Interval = Interval { fromInterval :: Integer } deriving (Show)
 toInterval :: Integer -> Interval
 toInterval = Interval
 
-newtype StartOfWeek { fromStartOfWeek :: WeekDay } deriving (Show)
+newtype StartOfWeek = StartOfWeek { fromStartOfWeek :: WeekDay } deriving (Show)
 
 toStartOfWeek :: WeekDay -> StartOfWeek
 toStartOfWeek = StartOfWeek

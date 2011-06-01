@@ -4,7 +4,9 @@ module Data.Time.Recurrence.Schedule
     )
   where
 
+import Control.Monad.Reader
 import Data.Foldable
+import qualified Data.List as L
 import Data.Monoid
 import Data.Time.Moment
 
@@ -12,13 +14,13 @@ newtype Schedule a = Schedule { fromSchedule :: [a] }
 
 instance Monoid (Schedule a) where
   mempty = Schedule []
-  x `mappend` y = Schedule $ (fromSchedule x) `mappend` (fromSchedule y)
+  x `mappend` y = Schedule $ (fromSchedule x) ++ (fromSchedule y)
 
 instance Functor Schedule where
   fmap f = Schedule . map f . fromSchedule
 
 instance Foldable Schedule where
-  foldr f = Schedule . foldr f . fromSchedule
+  foldr f b sch = (L.foldr f b $ fromSchedule sch)
 
 -- | /O(n)/, where @n@ is the length of the result. The 'unfoldr' function 
 -- is analogous to the List 'unfoldr'. 'unfoldr' builds a 'Schedule' from a 
@@ -30,7 +32,9 @@ unfoldr ::
   (a -> Reader (InitialMoment a) (Maybe (Schedule a, a))) -- ^ builder function
   -> a -- ^ seed value
   -> Reader (InitialMoment a) (Schedule a) -- ^ the resulting schedule
-unfoldr f = unfoldr' mempty
-  where
-    unfoldr' sch a = (f a) >>= return . maybe sch unfoldr'')
-      where unfoldr'' sch' a' = unfoldr' (sch `mappend` sch') a'
+unfoldr f b = do
+  r <- f b
+  case r of
+    Just (a, new_b) -> unfoldr f new_b 
+                       >>= \b -> return $ a `mappend` b
+    Nothing         -> return mempty

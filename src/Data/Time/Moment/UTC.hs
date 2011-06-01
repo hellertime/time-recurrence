@@ -11,12 +11,13 @@ module Data.Time.Moment.UTC
   where
 
 import Data.Time
+import Data.Time.Moment.Moment
 
 instance Moment UTCTime where
   epoch = UTCTime (toEnum 0) 0
-  addSeconds = flip addUTCTime . fromIntegral
+  addSeconds utc i = addUTCTime (fromIntegral i) utc
   addMonths (UTCTime d t) i = UTCTime (addGregorianMonthsRollOver i d) t
-  addYears (UTCTime d t) i = UTCTime (addGregorianYearsRollOVer i d) t
+  addYears (UTCTime d t) i = UTCTime (addGregorianYearsRollOver i d) t
 
 -- | @InitialMoment@ defaults for @UTCTime@
 
