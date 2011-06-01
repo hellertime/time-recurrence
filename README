@@ -4,3 +4,254 @@ The iCalendar Specifcation (RFC 5545) is used for inspiration of this
 library, however the library does not make an effort to track the RFC
 at all times. A future Data.Time.Recurrence.RFC5545 library would be
 a useful add-on for those in need of strict RFC compliance.
+
+Examples:
+
+> parse822Time :: String -> UTCTime
+> parse822Time = ...
+
+> nov1996 = parse822Time "Tue, 05 Nov 1996 09:00:00 -0400"
+> mar1997 = parse822Time "Mon, 10 Mar 1997 09:00:00 -0400"
+> sep1997 = parse822Time "Tue, 02 Sep 1997 09:00:00 -0400"
+> oct1997 = parse822Time "Fri, 10 Oct 1997 00:00:00 -0400"
+> dec1997 = parse822Time "Wed, 24 Dec 1997 00:00:00 -0400"
+> jan1998 = parse822Time "Thu, 01 Jan 1998 09:00:00 -0400"
+> jan2000 = parse822Time "Mon, 31 Jan 2000 09:00:00 -0400"
+
+Daily for 10 occurrences:
+
+> take 10 $ repeat1 $ daily sep1997
+
+Daily until Dec. 24, 1997:
+
+> takeWhile (<= dec1997) $ repeat1 $ daily sep1997
+
+Every other day - forever:
+
+> repeat1 $ dailyBy 2 sep1997
+
+Every 10 days, 5 occurrences:
+
+> take 5 $ repeat1 $ dailyBy 10 sep1997
+
+Every day in January, for 3 years:
+
+> takeWhile (<= jan2000) $ repeat $ 
+>   unfoldr calendarMonth `on` [January] >=>
+>   filter calendarWeekDay `by` [Monday .. Sunday] $ 
+>   yearly jan1998
+
+or
+
+> takeWhile (<= jan2000) $ repeat $ 
+>   filter calendarMonth `by` [January] $ 
+>   daily jan1998
+
+Weekly for 10 occurrences:
+
+> take 10 $ repeat1 $ weekly sep1997
+
+Weekly until Dec. 24, 1997:
+
+> takeWhile (<= dec1997) $ repeat1 $ weeklyWithStartOfWeek Sunday sep1997
+
+Every other week - forever:
+
+> repeat $ weeklyBy 2 sep1997
+
+Weekly on Tuesday and Thursday for five weeks:
+
+> takeUntil (<= oct1997) $ repeat $
+>   unfoldr calendarWeekDay `on` [Tuesday, Thursday] $
+>   weeklyWithStartOfWeek Sunday sep1997
+
+or
+
+> take 10 $ repeat $ 
+>   unfoldr calendarWeekDay `on` [Tuesday, Thursday] $
+>   weeklyWithStartOfWeek Sunday sep1997
+
+Every other week (Monday, Wednesday, Firday) until Dec. 24, 1997:
+
+> takeWhile (<= dec1997) $ repeat $
+>   unfoldr calendarWeekDay `on` [Monday, Wednesday, Friday] $
+>   weeklyWithStartOfWeekBy 2 Sunday sep1997
+
+> Every other week on Tuesday and Thursday, for 8 occurrences:
+
+> take 8 $ repeat $
+>   unfoldr calendarWeekDay `on` [Tuesday, Thursday] $
+>   weeklyWithStartOfWeekBy 2 Sunday sep1997
+
+Monthly on the first Friday for 10 occurrences:
+
+> take 10 $ repeat $
+>   unfoldr calendarWeekDay `onPosition` [(Friday,1)] $
+>   monthly sep1997
+
+Monthly on the first Friday until Dec. 24, 1997
+
+> takeWhile (<= dec1997) $ repeat $
+>   unfoldr calendarWeekDay `onPosition` [(Friday,1)] $
+>   monthly sep1997
+
+Every other month on the first and last Sunday of the month for 10 occurrences:
+
+> take 10 $ repeat $
+>   unfoldr calendarWeekDay `onPosition` [(Sunday,1),(Sunday,-1)] $
+>   monthlyBy 2 sep1997
+
+Monthly on the second-to-last Monday of the month for 6 months:
+
+> take 6 $ repeat $
+>   unfoldr calendarWeekDay `onPosition` [(Monday,-2)] $
+>   monthly sep1997
+
+Monthly on the third-to-last day of the month, forever:
+
+> repeat $ unfoldr calendarDay `on` [-3] $ monthly sep1997
+
+Monthly on the 2nd and 15th of the month for 10 occurrences:
+
+> take 10 $ repeat $ unfoldr calendarDay `on` [2,15] $ monthy sep1997
+
+Monthly on the first and last day of the month for 10 occurrences:
+
+> take 10 $ repeat $ unfoldr calendarDay `on` [1,-1] $ monthly sep1997
+
+Every 18 months on the 10th thru 15th of the month for 10 occurrences:
+
+> take 10 $ repeat $ unfoldr calendarDay `on` [10 .. 15] $ monthlyBy 18 sep1997
+
+Every Tuesday, every other month:
+
+> repeat $ unfoldr calendarWeekDay `on` [Tuesday] $ monthlyBy 2 sep1997
+
+Yearly in June and July for 10 occurrences:
+
+> take 10 $ repeat $ 
+>   unfoldr calendarMonth `on` [June,July] $
+>   yearly sep1997
+
+Every other year on January thru March for 10 occurrences:
+
+> take 10 $ repeat $ 
+>   unfoldr calendarMonth `on` [January .. March] $
+>   yearlyBy 2 mar1997
+
+Every third year on the 1st, 100th, and 200th day for 10 occurrences:
+
+> take 10 $ repeat $ 
+>   unfoldr calendarYearDay `on` [1,100,200] $ 
+>   yearlyBy 3 sep1997
+
+Every 20th Monday of the year, forever:
+
+> repeat $ unfoldr calendarWeekDay `onPosition` [(Monday,20)] $ yearly sep1997
+
+Monday of week number 20, forever:
+
+> repeat $ 
+>   unfoldr calendarWeekNumber `on` [20] >=>
+>   filter calendarWeekDay `by` [Monday] $
+>   yearly mar1997
+
+Every Thursday in March, forever:
+
+> repeat $
+>   unfoldr calendarMonth `on` [March] >=>
+>   filter calendarWeekDay `by` [Thursday] $
+>   yearly mar1997
+
+Every Thursday, but only during June thru August, forever:
+
+> repeat $
+>   unfoldr calendarMonth `on` [June .. August] >=>
+>   filter calendarWeekDay `by` [Thursday] $
+>   yearly mar1997
+
+Firday the 13th, Forever:
+
+> repeat $
+>   unfoldr calendarDay `on` [13] >=>
+>   filter calendarWeekDay `by` [Friday] $
+>   monthly sep1997
+
+The first Saturday that follows the first Sunday of the month, forever:
+
+> repeat $
+>   unfoldr calendarDay `on` [7 .. 13] >=>
+>   filter calendarWeekDay `by` [Saturday] $
+>   monthly sep1997
+
+U.S. Presidential Election Day:
+Every 4 years, the first Tuesday after a Monday in November, forever:
+
+> repeat $
+>   unfoldr calendarMonth `on` [November] >=>
+>   filter calendarDay `by` [2 .. 8] >=>
+>   filter calendarWeekDay `by` [Tuesday] $
+>   yearlyBy 4 nov1996
+
+The third instance into the month of one of Tuesday, Wednesday, or Thursday, for the next 3 months.
+
+> take 3 $ repeat $
+>   unfoldr calendarWeekDay `onInstance` ([Tuesday .. Thursday],[3]) $
+>   monthly sep1997
+
+The second-to-last weekday of the month:
+
+> repeat $
+>   unfoldr calendarWeekDay `onInstance` ([Monday .. Friday],[-2]) $
+>   monthly sep1997
+
+Every 3 hours from 9:00 AM to 5:00 PM on a specific day:
+
+> takeWhile (<= addSeconds sep1997 (8 * oneHour)) $ repeat1 $ hourlyBy 3 sep1997
+
+Every 15 minutes for 6 occurrences:
+
+> take 6 $ repeat1 $ minutelyBy 15 sep1997
+
+Every hour and a hald for 4 occurrences:
+
+> take 4 $ repeat1 $ minutelyBy 90 sep1997
+
+Every 20 minutes from 9:00 AM to 4:40 PM every day:
+
+> repeat $
+>   unfoldr calendarHour `on` [9 .. 16] >=>
+>   unfoldr calendarMinute `on` [0,20,40] $
+>   daily sep1997
+
+or
+
+> repeat $ unfoldr calendarHour `on` [9 .. 16] $ minutelyBy 20 sep1997
+
+The following two examples will generate different results due to changes in the start of the week.
+
+> take 4 $ repeat $
+>   unfoldr calendarWeekDay `on` [Tuesday,Sunday] $
+>   weeklyWithStartOfWeekBy 2 Monday sep1997
+
+vs
+
+> take 4 $ repeat $
+>   unfoldr calendarWeekDay `on` [Tuesday,Sunday] $
+>   weeklyWithStartOfWeekBy 2 Sunday sep1997
+
+An example where an invalid date (Feb. 30) is ignored:
+
+> take 5 $ repeat $
+>   unfoldr calendarDay `on` [15,30] $
+>   monthly jan2000
+
+The 15th and the 30th of the month, forever:
+
+> repeat $ unfoldr calendarDay `on` [15,30] $ monthly sep1997
+
+The 15th and the 30th of the month, but only during the work week:
+> repeat $ 
+>   unfoldr calendarDay `on` [15,30] >=>
+>   filter calendarWeekDay `by` [Monday .. Friday]
+>   monthly sep1997

@@ -16,13 +16,10 @@ module Data.Time.Recurrence.Schedule
 
       -- * Transforming 'Schedule's
     , map
+    , concatMap
 
       -- * Searching with a predicate
     , filter
-
-      -- * predicate builders
-    , by
-    , by'
     )
   where
 
@@ -33,7 +30,6 @@ import Data.List.Ordered (nubSort)
 import Data.Monoid
 import Data.Time.CalendarTime
 import Data.Time.Moment
-import Data.Time.Recurrence.Private
 
 newtype Schedule a = Schedule { fromSchedule :: [a] } deriving (Show, Eq, Ord)
 
@@ -89,29 +85,14 @@ filter ::
   -> Reader (InitialMoment a) (Schedule a)
 filter p sch = filterM p (fromSchedule sch) >>= return . Schedule
 
---
--- Useful predicates to 'filter'
-
--- | Predicate builder
-by :: 
-  (CalendarTimeConvertible a, Ord b) => 
-  (CalendarTime -> b) 
-  -> [b] 
-  -> a 
-  -> Reader (InitialMoment a) Bool
-by f bs a = return $ f (toCalendarTime a) `elem` nubSort bs
-
-by' :: 
-  (CalendarTimeConvertible a) => 
-  (CalendarTime -> Int) 
-  -> Int 
-  -> [Int] 
-  -> a 
-  -> Reader (InitialMoment a) Bool
-by' f n bs = by f $ mapNormIndex n bs
-
 map ::
   (a -> Reader (InitialMoment a) a)
   -> Schedule a
   -> Reader (InitialMoment a) (Schedule a)
 map f s = mapM f (fromSchedule s) >>= return . Schedule
+
+concatMap ::
+  (a -> Reader (InitialMoment a) (Schedule a))
+  -> Schedule a
+  -> Reader (InitialMoment a) (Schedule a)
+concatMap f s = mapM f (fromSchedule s) >>= return . mconcat

@@ -31,7 +31,7 @@ to use.
 > date1 = parse822Time "Tue, 02 Sep 1997 09:00:00 -0400"
 > date2 = parse822Time "Wed, 24 Dec 1997 00:00:00 -0400"
 > date3 = parse822Time "Thu, 01 Jan 1998 09:00:00 -0400"
-> date4 = parse822Time "Mon, 01 Jan 2000 09:00:00 -0400"
+> date4 = parse822Time "Mon, 31 Jan 2000 09:00:00 -0400"
 
 > main :: IO ()
 > main = defaultMain tests

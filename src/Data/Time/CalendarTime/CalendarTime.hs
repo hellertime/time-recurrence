@@ -3,6 +3,7 @@ module Data.Time.CalendarTime.CalendarTime
       -- * Calendar Time
       CalendarTime (..)
     , toDay
+    , withDay
     , toTimeOfDay
 
       -- * Calendar Time Convertible
@@ -45,6 +46,14 @@ toDay t = fromGregorianValid (calendarYear t) (fromEnum $ calendarMonth t) (cale
 toTimeOfDay :: CalendarTime -> Maybe TimeOfDay
 toTimeOfDay t = makeTimeOfDayValid (calendarHour t) (calendarMinute t) (toEnum $ calendarSecond t)
 
+-- | Change y-m-d in 'CalendarTime'
+withDay :: CalendarTime -> Day -> CalendarTime
+withDay ct day = ct
+               { calendarYear = y
+               , calendarMonth = toEnum m
+               , calendarDay = d}
+  where
+    (y, m, d) = toGregorian day
 
 instance CalendarTimeConvertible UTCTime where
   toCalendarTime (UTCTime utcDay utcTime) = CalendarTime (fromEnum ss) mm hh d (toEnum m) y weekDay yearDay utc
