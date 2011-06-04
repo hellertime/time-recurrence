@@ -5,94 +5,99 @@
 module Data.Time.Recurrence.Schedule
     (
       Schedule -- abstract, instances: Eq, Ord, Show
-    , toList
-
-      -- * Reducing 'Schedule's (folds)
-    , foldl
-
-      -- * Generating 'Schedule's
-    , unfoldr
-    , iterate
-
-      -- * Transforming 'Schedule's
-    , map
-    , concatMap
-
-      -- * Searching with a predicate
-    , filter
+    , recur
+    , starting
+    , begin
+{-
+    , every
+    , onMonths
+    , only
+    , byWeekDays
+-}
     )
   where
 
-import Prelude hiding (filter, map, foldl, iterate)
 import Control.Monad.Reader
-import qualified Data.List as L
-import Data.List.Ordered (nubSort)
-import Data.Monoid
-import Data.Time.CalendarTime
+import Data.List as L
+import Data.List.Ordered as O
+import Data.Maybe (fromJust, fromMaybe)
+import Data.Time.Calendar.Month
+import Data.Time.Calendar.WeekDay
+import Data.Time.CalendarTime hiding (withDay)
 import Data.Time.Moment
 
-newtype Schedule a = Schedule { fromSchedule :: [a] } deriving (Show, Eq, Ord)
+type Schedule a = Reader (InitialMoment a) [a]
 
-toList :: Schedule a -> [a]
-toList = fromSchedule
+runSchedule :: Schedule a -> InitialMoment a -> [a]
+runSchedule = runReader
 
-instance Monoid (Schedule a) where
-  mempty = Schedule []
-  x `mappend` y = Schedule $ (fromSchedule x) ++ (fromSchedule y)
-
--- ----------------------------------------------------------------------------
--- Unfolds
-
--- | The 'unfoldr' function is analogous to the List 'unfoldr'. 
--- 'unfoldr' builds a 'Schedule' from a seed value. The function takes the 
--- element and returns 'Nothing' if it is done producing the 'Schedule', 
--- otherwise 'Just' @(a, b)@. In this case, @a@ is a 'Schedule' to which 
--- further output is appended to and b is used as the next seed in a 
--- recursive call
-unfoldr :: 
-  (a -> Reader (InitialMoment a) (Maybe (Schedule a, a))) -- ^ builder function
-  -> a -- ^ seed value
-  -> Reader (InitialMoment a) (Schedule a) -- ^ the resulting schedule
-unfoldr f b = do
-  r <- f b
-  case r of
-    Just (a, new_b) -> unfoldr f new_b 
-                       >>= \b -> return $ a `mappend` b
-    Nothing         -> return mempty
-
--- | 'iterate' returns an ininite 'Schedule' of repeated applications of 'f' on
--- the 'Reader'
-iterate ::
-  (a -> Reader (InitialMoment a) a)
-  -> Reader (InitialMoment a) (Schedule a)
-iterate f = asks moment 
-            >>= unfoldr (\x -> f x 
-                               >>= \x' -> return $ Just (Schedule [x'], x'))
-
-foldl :: 
-  (a -> a -> Reader (InitialMoment a) a)
-  -> a
-  -> Schedule a
-  -> Reader (InitialMoment a) (Schedule a)
-foldl f a s = go a (fromSchedule s)
+repeatSchedule :: 
+  Moment a  => 
+  InitialMoment a 
+  -> (Schedule a -> Schedule a) 
+  -> [a]
+repeatSchedule im sch = runSchedule (sch iterateInitialMoment) im
   where
-   go a' []     = return $ Schedule [a']
-   go a' (x:xs) = f a' x >>= \a'' -> go a'' xs
+    iterateInitialMoment :: Moment a => Schedule a
+    iterateInitialMoment = do
+      im <- ask
+      return $ iterate (next (interval im) (period im)) (moment im)
 
-filter ::
-  (a -> Reader (InitialMoment a) Bool)
-  -> Schedule a
-  -> Reader (InitialMoment a) (Schedule a)
-filter p sch = filterM p (fromSchedule sch) >>= return . Schedule
+recur :: a -> a
+recur = id
 
-map ::
-  (a -> Reader (InitialMoment a) a)
-  -> Schedule a
-  -> Reader (InitialMoment a) (Schedule a)
-map f s = mapM f (fromSchedule s) >>= return . Schedule
+-- | 'starting' is an infinite list of 'Moment's, where no 'Moment' 
+-- occurrs before the 'InitialMoment'. The list is further refined
+-- by the passed in function.
+starting :: 
+  (Ord a, Moment a) => 
+  InitialMoment a 
+  -> a 
+  -> (Schedule a -> Schedule a) 
+  -> [a]
+starting im m0 = dropWhile (< m0) . O.nub . repeatSchedule im{moment=m0}
 
-concatMap ::
-  (a -> Reader (InitialMoment a) (Schedule a))
+begin :: 
+  (Ord a, Moment a) => 
+  InitialMoment a 
+  -> a 
+  -> [a]
+begin im m0 = starting im m0 (liftM id)
+
+
+
+{-
+-- | 'onMonths' computes the bounds for the 'month' given a 'moment', and
+-- returns a starting value and function to generate the moments with 'unfoldr'
+onMonths :: 
+  (CalendarTimeConvertible a, Moment a, Ord a) => 
+  Month 
+  -> (a -> Maybe (a, a))
+onMonths months = go months
+  go []     _  = Nothing
+  go (m:ms) m0 = do
+    m0    <- withDay moment 1
+    start <- withMonth m0 month
+    end   <- withDay start $ lastDayOfMonth start
+  return (start, \a0 -> if a0 <= end then Just (a0, step a0) else Nothing)
+  where step = next (toInterval 1) Days
+
+-- | 'every' maps over the 'Moment's in the 'Schedule' and for each
+-- 'Moment' it applys an unfold using the supplied function.
+-- The associated list 
+every ::
+  Moment a => 
+  (a -> b -> (a, a -> Maybe (a, a))) 
+  -> [b] 
+  -> [a] 
   -> Schedule a
-  -> Reader (InitialMoment a) (Schedule a)
-concatMap f s = mapM f (fromSchedule s) >>= return . mconcat
+every f bs as = return $ concat [(uncurry $ flip L.unfoldr) (f a b) 
+                                | b <- bs
+                                , a <- as]
+
+byWeekDays :: (CalendarTimeConvertible a, Moment a) => [WeekDay] -> a -> Bool
+byWeekDays bs = flip elem bs . calendarWeekDay . toCalendarTime
+
+only :: Moment a => ([b] -> a -> Bool) -> [b] -> [a] -> Schedule a
+only f bs as = return $ filter (f bs) as
+-}
