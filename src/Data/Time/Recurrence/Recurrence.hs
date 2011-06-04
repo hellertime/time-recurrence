@@ -1,11 +1,13 @@
 module Data.Time.Recurrence.Recurrence
     (
+{-
       repeatSchedule
     , repeatSchedule1
     , by
     , by'
     , calendarDay'
     , calendarYearDay'
+-}
     )
   where
 
@@ -16,6 +18,7 @@ import Data.Time.CalendarTime
 import Data.Time.Moment
 import qualified Data.Time.Recurrence.Schedule as S
 
+{-
 enumMoments ::
   (Interval -> Frequency -> a -> a)
   -> Reader (InitialMoment a) (S.Schedule a)
@@ -90,5 +93,5 @@ on ::
   -> a
   -> Reader (InitialMoment a) (Schedule a)
 on f bs a = return $ Schedule $ mapMaybe (f a) bs
-
+-}
 
