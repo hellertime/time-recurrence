@@ -14,6 +14,7 @@ module Data.Time.CalendarTime.CalendarTime
 import Data.Time
 import Data.Time.Calendar.OrdinalDate
 import Data.Time.Calendar.Month
+import Data.Time.Calendar.MonthDay
 import Data.Time.Calendar.WeekDay
 import System.IO.Unsafe
 
@@ -92,3 +93,7 @@ instance CalendarTimeConvertible ZonedTime where
     day <- toDay t
     time <- toTimeOfDay t
     return $ ZonedTime (LocalTime day time) (calendarTimeZone t)
+
+lastDayOfMonth :: (CalendarTimeConvertible a) => a -> Int
+lastDayOfMonth t = let ct = toCalendarTime t
+  in monthLength (isLeapYear $ calendarYear ct) (fromEnum $ calendarMonth ct)
