@@ -4,7 +4,7 @@ module Data.Time.Moment.Moment
       Moment (..)
     , iterateMoments
     , withYearDay
-    , withWeekDay
+    , withWeekNumber
     , withSecond
     , withMinute
     , withHour
@@ -24,23 +24,10 @@ module Data.Time.Moment.Moment
     , monthly
     , yearly
 
-      -- * Initial Moment with Interval
-    , secondlyBy
-    , minutelyBy
-    , hourlyBy
-    , dailyBy
-    , weeklyBy
-    , monthlyBy
-    , yearlyBy
-
-      -- * Initial Moment with Interval and StartOfWeek
-    , secondlyWithStartOfWeekBy
-    , minutelyWithStartOfWeekBy
-    , hourlyWithStartOfWeekBy
-    , dailyWithStartOfWeekBy
-    , weeklyWithStartOfWeekBy
-    , monthlyWithStartOfWeekBy
-    , yearlyWithStartOfWeekBy
+      -- * Adjust Interval
+    , by
+      -- * Adjust Start of Week
+    , withStartOfWeek
 
       -- * Period
     , Period (..)
@@ -57,7 +44,7 @@ import Data.Time.Calendar.Month
 import Data.Time.Calendar.OrdinalDate
 import Data.Time.Calendar.WeekDay
 import Data.Time.Calendar.WeekDate
-import Data.Time.CalendarTime
+import Data.Time.CalendarTime hiding (withDay)
 import qualified Data.Time.CalendarTime as CT
 
 oneSecond :: Integer
@@ -194,119 +181,17 @@ monthly = mkIM Months
 yearly :: Moment a => InitialMoment a
 yearly = mkIM Years
 
-momentsWithStartOfWeekBy :: 
-  Moment a => 
-  Period             -- ^ Period of repitition for the generated 'Moment's
-  -> Integer         -- ^ Spacing between periods
-  -> WeekDay         -- ^ Used when determining what week a Day is a part of
-  -> a               -- ^ Initial 'Moment'
-  -> InitialMoment a -- ^ 'InitialMoment'
-momentsWithStartOfWeekBy p i s m0 = (m `asTypeOf` m0)
-                                  { interval    = toInterval i
-                                  , startOfWeek = toStartOfWeek s
-                                  , moment      = m0
-                                  }
-  where
-    m = case p of
-          Seconds -> secondly
-          Minutes -> minutely
-          Hours   -> hourly
-          Days    -> daily
-          Weeks   -> weekly
-          Months  -> monthly
-          Years   -> yearly
+-- | Typically called infix on an existing 'InitialMoment', like:
+-- 
+-- > monthly `by` 2
+by :: InitialMoment a -> Integer -> InitialMoment a
+by im i = im{interval=toInterval i}
 
-momentsBy :: Moment a => Period -> Integer -> a -> InitialMoment a
-momentsBy p i m0 = (m `asTypeOf m0)
-                 { interval = toInterval i
-                 , moment   = m0
-                 }
-  where
-    m = case p of
-          Seconds -> secondly
-          Minutes -> minutely
-          Hours   -> hourly
-          Days    -> daily
-          Weeks   -> weekly
-          Months  -> monthly
-          Years   -> yearly
-
-secondlyWithStartOfWeekBy ::
-  Moment a =>
-  Integer
-  -> WeekDay
-  -> a
-  -> InitialMoment a
-secondlyWithStartOfWeekBy = momentsWithStartOfWeekBy Seconds
-
-secondlyBy :: Moment a => Integer -> a -> InitialMoment a
-secondlyBy = momentsBy Seconds
-
-minutelyWithStartOfWeekBy ::
-  Moment a =>
-  Integer
-  -> WeekDay
-  -> a
-  -> InitialMoment a
-minutelyWithStartOfWeekBy = momentsWithStartOfWeekBy Minutes
-
-minutelyBy :: Moment a => Integer -> a -> InitialMoment a
-minutelyBy i = momentsBy Minutes
-
-hourlyWithStartOfWeekBy ::
-  Moment a =>
-  Integer
-  -> WeekDay
-  -> a
-  -> InitialMoment a
-hourlyWithStartOfWeekBy = momentsWithStartOfWeekBy Hours
-
-hourlyBy :: Moment a => Integer -> a -> InitialMoment a
-hourlyBy = momentsBy Hours
-
-dailyWithStartOfWeekBy ::
-  Moment a =>
-  Integer
-  -> WeekDay
-  -> a
-  -> InitialMoment a
-dailyWithStartOfWeekBy = momentsWithStartOfWeekBy Days
-
-dailyBy :: Moment a => Integer -> a -> InitialMoment a
-dailyBy = momentsBy Days
-
-weeklyWithStartOfWeekBy ::
-  Moment a =>
-  Integer
-  -> WeekDay
-  -> a
-  -> InitialMoment a
-weeklyWithStartOfWeekBy = momentsWithStartOfWeekBy Days
-
-weeklyBy :: Moment a => Integer -> a -> InitialMoment a
-weeklyBy = momentsBy Days
-
-monthlyWithStartOfWeekBy ::
-  Moment a => 
-  Integer
-  -> WeekDay
-  -> a
-  -> InitialMoment a
-monthlyWithStartOfWeekBy = momentsWithStartOfWeekBy Months
-
-monthlyBy :: Moment a => Integer -> a -> InitialMoment a
-monthlyBy = momentsBy Months
-
-yearlyWithStartOfWeekBy ::
-  Moment a =>
-  Integer
-  -> WeekDay
-  -> a
-  -> InitialMoment a
-yearlyWithStartOfWeekBy = momentsWithStartOfWeekBy Years
-
-yearlyBy :: Moment a => Integer -> a -> InitialMoment a
-yearlyBy = momentsBy Years
+-- | Typically called infix on an existing 'InitialMoment', like:
+--
+-- > weekly `withStartOfWeek` Tuesday
+withStartOfWeek :: InitialMoment a -> WeekDay -> InitialMoment a
+withStartOfWeek im sow = im{startOfWeek=toStartOfWeek sow}
 
 -- | @Period@ data type
 data Period
@@ -317,7 +202,7 @@ data Period
     | Weeks
     | Months
     | Years
-  deriving (Show)
+  deriving (Enum, Bounded, Eq, Ord, Show)
 
 newtype Interval = Interval { fromInterval :: Integer } deriving (Show)
 
@@ -328,3 +213,4 @@ newtype StartOfWeek = StartOfWeek { fromStartOfWeek :: WeekDay } deriving (Show)
 
 toStartOfWeek :: WeekDay -> StartOfWeek
 toStartOfWeek = StartOfWeek
+
