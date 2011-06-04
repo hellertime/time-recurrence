@@ -34,9 +34,9 @@ runSchedule = runReader
 repeatSchedule :: 
   Moment a  => 
   InitialMoment a 
-  -> (Schedule a -> Schedule a) 
+  -> ([a] -> Schedule a) 
   -> [a]
-repeatSchedule im sch = runSchedule (sch iterateInitialMoment) im
+repeatSchedule im sch = runSchedule (iterateInitialMoment >>= sch) im
   where
     iterateInitialMoment :: Moment a => Schedule a
     iterateInitialMoment = do
@@ -49,20 +49,15 @@ recur = id
 -- | 'starting' is an infinite list of 'Moment's, where no 'Moment' 
 -- occurrs before the 'InitialMoment'. The list is further refined
 -- by the passed in function.
-starting :: 
-  (Ord a, Moment a) => 
+starting :: (Ord a, Moment a) => 
   InitialMoment a 
   -> a 
-  -> (Schedule a -> Schedule a) 
+  -> ([a] -> Schedule a) 
   -> [a]
 starting im m0 = dropWhile (< m0) . O.nub . repeatSchedule im{moment=m0}
 
-begin :: 
-  (Ord a, Moment a) => 
-  InitialMoment a 
-  -> a 
-  -> [a]
-begin im m0 = starting im m0 (liftM id)
+begin :: (Ord a, Moment a) => InitialMoment a -> a -> [a]
+begin im m0 = starting im m0 (return)
 
 
 
