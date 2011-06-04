@@ -20,56 +20,62 @@ Examples:
 
 Daily for 10 occurrences:
 
-> take 10 $ repeat1 $ daily sep1997
+> take 10 $ recur daily `begin` sep1997
 
 Daily until Dec. 24, 1997:
 
-> takeWhile (<= dec1997) $ repeat1 $ daily sep1997
+> takeWhile (<= dec1997) $ recur daily `begin` sep1997
 
 Every other day - forever:
 
-> repeat1 $ dailyBy 2 sep1997
+> recur daily `by` 2 `begin` sep1997
 
 Every 10 days, 5 occurrences:
 
-> take 5 $ repeat1 $ dailyBy 10 sep1997
+> take 5 $ recur daily `by` 10 `begin` sep1997
 
 Every day in January, for 3 years:
 
-> takeWhile (<= jan2000) $ repeat $ 
->   unfoldr calendarMonth `on` [January] >=>
->   filter calendarWeekDay `by` [Monday .. Sunday] $ 
->   yearly jan1998
+> until jan2000 $ recur yearly `by` 2 `starting` jan1998
+> until jan2000 $ starting jan1998 yearly `by` 2
+>   
+>   liftYears $ unfoldMap withMonth [January]
+>   liftMonths $ unfoldMap withWeekDay [Monday .. Sunday]
+>   liftWeekDays $ filter withHour [0,6,12,18]
 
-or
+> until jan2000 $ recur yearly `starting` jan1998
+>   recur Monthly `every` [January]
+>   recur Weekly   `every` [Monday .. Sunday]
+>   recur
 
-> takeWhile (<= jan2000) $ repeat $ 
->   filter calendarMonth `by` [January] $ 
->   daily jan1998
+> takeWhile (<= jan2000) $ recur yearly `starting` jan1998 $
+>   recur onMonths `every` [January] >=>
+>   recur byWeekDays `only` [Monday .. Sunday]
+
+> takeWhile (<= jan2000) $ recur daily `starting` jan1998 $
+>   recur byMonths `only` [January]
 
 Weekly for 10 occurrences:
 
-> take 10 $ repeat1 $ weekly sep1997
+> take 10 $ recur weekly `begin` sep1997
 
 Weekly until Dec. 24, 1997:
 
-> takeWhile (<= dec1997) $ repeat1 $ weeklyWithStartOfWeek Sunday sep1997
+> takeWhile (<= dec1997) $ recur weekly `withStartOfWeek` Sunday `begin` sep1997
 
 Every other week - forever:
 
-> repeat $ weeklyBy 2 sep1997
+> recur weekly `by` 2 `begin` sep1997
 
 Weekly on Tuesday and Thursday for five weeks:
 
-> takeUntil (<= oct1997) $ repeat $
->   unfoldr calendarWeekDay `on` [Tuesday, Thursday] $
->   weeklyWithStartOfWeek Sunday sep1997
+> takeUntil (<= oct1997) $ recur weekly `withStartOfWeek` Sunday `starting` sep1997 $
+>   recur calendarWeekDay `every` [Tuesday, Thursday]
 
 or
 
-> take 10 $ repeat $ 
->   unfoldr calendarWeekDay `on` [Tuesday, Thursday] $
->   weeklyWithStartOfWeek Sunday sep1997
+> take 10 $ recur weekly `withStartOfWeek` Sunday `starting` sep1997 $
+>   recur calendarWeekDay `every` [Tuesday, Thursday]
 
 Every other week (Monday, Wednesday, Firday) until Dec. 24, 1997:
 
