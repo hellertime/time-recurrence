@@ -107,7 +107,7 @@ enumWeekDays wdays as = return $ concatMap (enumWeekDays' wdays) as
       in flip unfoldr (a0,cycle wdays) (\(a, (w:ws)) -> let
            a'       = advanceToWeekDay a w
            in if m0 == (calendarMonth $ toCalendarTime a)
-                then Just (a, (a', tail ws))
+                then Just (a, (a', ws))
                 else Nothing
           )
 
