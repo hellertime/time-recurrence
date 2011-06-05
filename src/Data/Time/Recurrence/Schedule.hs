@@ -111,6 +111,35 @@ enumWeekDays wdays as = return $ concatMap (enumWeekDays' wdays) as
                 else Nothing
           )
 
+enumHours ::
+  (CalendarTimeConvertible a, Moment a) =>
+  [Int]
+  -> [a]
+  -> Schedule a
+enumHours hours as = return $ concatMap (enumHours' hours) as
+  where
+    enumHours' hours a = mapMaybe (withHour a) (hours' a hours)
+    hours' a = mapMaybe $ normalizeOrdinalIndex 23
+
+enumMinutes ::
+  (CalendarTimeConvertible a, Moment a) =>
+  [Int]
+  -> [a]
+  -> Schedule a
+enumMinutes ms as = return $ concatMap (enumMinutes' ms) as
+  where
+    enumMinutes' ms a = mapMaybe (withMinute a) (ms' a ms)
+    ms' a = mapMaybe $ normalizeOrdinalIndex 59
+
+enumSeconds ::
+  (CalendarTimeConvertible a, Moment a) => 
+  [Int]
+  -> [a]
+  -> Schedule a
+enumSeconds secs as = return $ concatMap (enumSeconds' secs) as
+  where
+    enumSeconds' secs a = mapMaybe (withSeconds a) (secs' a secs)
+    secs' a = mapMaybe $ normalizeOrdinalIndex 60
 {-
 -- | 'onMonths' computes the bounds for the 'month' given a 'moment', and
 -- returns a starting value and function to generate the moments with 'unfoldr'
