@@ -5,6 +5,7 @@ module Data.Time.CalendarTime.CalendarTime
     , toDay
     , withDay
     , toTimeOfDay
+    , lastDayOfMonth
 
       -- * Calendar Time Convertible
     , CalendarTimeConvertible (..)
