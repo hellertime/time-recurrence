@@ -32,12 +32,6 @@ module Data.Time.Moment.Moment
 
       -- * Period
     , Period (..)
-
-    , Interval (fromInterval)
-    , toInterval
-
-    , StartOfWeek (fromStartOfWeek)
-    , toStartOfWeek
     )
   where
 
@@ -47,6 +41,9 @@ import Data.Time.Calendar.WeekDay
 import Data.Time.Calendar.WeekDate
 import Data.Time.CalendarTime hiding (withDay)
 import qualified Data.Time.CalendarTime as CT
+import Data.Time.Moment.Interval
+import Data.Time.Moment.Private
+import Data.Time.Moment.StartOfWeek
 
 oneSecond :: Integer
 oneSecond = 1
@@ -221,14 +218,3 @@ data Period
     | Months
     | Years
   deriving (Enum, Bounded, Eq, Ord, Show)
-
-newtype Interval = Interval { fromInterval :: Integer } deriving (Show)
-
-toInterval :: Integer -> Interval
-toInterval = Interval
-
-newtype StartOfWeek = StartOfWeek { fromStartOfWeek :: WeekDay } deriving (Show)
-
-toStartOfWeek :: WeekDay -> StartOfWeek
-toStartOfWeek = StartOfWeek
-

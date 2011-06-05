@@ -6,6 +6,7 @@ module Data.Time.CalendarTime.CalendarTime
     , withDay
     , toTimeOfDay
     , lastDayOfMonth
+    , weekNumber
 
       -- * Calendar Time Convertible
     , CalendarTimeConvertible (..)
@@ -17,6 +18,7 @@ import Data.Time.Calendar.OrdinalDate
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.MonthDay
 import Data.Time.Calendar.WeekDay
+import Data.Time.Moment.StartOfWeek
 import System.IO.Unsafe
 
 -- | A representation of calendar time separated into year, month, day, and so on.
@@ -39,6 +41,10 @@ class CalendarTimeConvertible t where
   toCalendarTime :: t -> CalendarTime
   -- | Convert from a 'CalendarTime'
   fromCalendarTime :: CalendarTime -> Maybe t
+
+instance CalendarTimeConvertible CalendarTime where
+  toCalendarTime = id
+  fromCalendarTime = Just . id
 
 -- | Convert to a 'Day'
 toDay :: CalendarTime -> Maybe Day
@@ -98,3 +104,8 @@ instance CalendarTimeConvertible ZonedTime where
 lastDayOfMonth :: (CalendarTimeConvertible a) => a -> Int
 lastDayOfMonth t = let ct = toCalendarTime t
   in monthLength (isLeapYear $ calendarYear ct) (fromEnum $ calendarMonth ct)
+
+weekNumber :: (CalendarTimeConvertible a) => StartOfWeek -> a -> Maybe Int
+weekNumber _  t = do
+  day <- toDay $ toCalendarTime t
+  return $ fst $ mondayStartWeek day
