@@ -11,6 +11,7 @@ module Data.Time.Moment.Moment
     , withDay
     , withMonth
     , withYear
+    , advanceToWeekDay
 
       -- * Initial Moment
     , InitialMoment (..)
@@ -75,6 +76,15 @@ class Moment a where
   addSeconds :: a -> Integer -> a
   addMonths  :: a -> Integer -> a
   addYears   :: a -> Integer -> a
+
+  addMinutes :: a -> Integer -> a
+  addMinutes a = addSeconds a . (* oneMinute)
+  addHours   :: a -> Integer -> a
+  addHours a = addSeconds a . (* oneHour)
+  addDays    :: a -> Integer -> a
+  addDays a = addSeconds a . (* oneDay)
+  addWeeks   :: a -> Integer -> a
+  addWeeks a = addSeconds a . (* oneWeek)
 
   -- | Produce a new @Moment@ in the future ocurring at (/interval/ * /freq/)
   next :: Interval -> Period -> a -> a
@@ -144,6 +154,14 @@ withMonth t m = fromCalendarTime (toCalendarTime t){calendarMonth = m}
 -- | Possibly produce a 'Moment' with the given year
 withYear :: (CalendarTimeConvertible a, Moment a) => a -> Integer -> Maybe a
 withYear t y = fromCalendarTime (toCalendarTime t){calendarYear = y}
+
+advanceToWeekDay :: (CalendarTimeConvertible a, Moment a) => a -> WeekDay -> a
+advanceToWeekDay t d = let
+  ct = toCalendarTime t
+  d0 = calendarWeekDay ct
+  in if d0 == d 
+    then t 
+    else addDays t $ toInteger $ 1 + (fromEnum d - fromEnum Monday) `mod` 6
 
 -- | The @InitialMoment@ datatype
 
