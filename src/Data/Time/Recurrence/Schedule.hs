@@ -14,9 +14,19 @@ module Data.Time.Recurrence.Schedule
     , only
     , byWeekDays
 -}
+    , enumMonths
     , enumDays
     , enumWeekDays
-    , enumMonths
+    , enumHours
+    , enumMinutes
+    , enumSeconds
+
+    , nthMonth
+    , nthDay
+    , nthWeekDay
+    , nthHour
+    , nthMinute
+    , nthSecond
     )
   where
 
@@ -138,8 +148,69 @@ enumSeconds ::
   -> Schedule a
 enumSeconds secs as = return $ concatMap (enumSeconds' secs) as
   where
-    enumSeconds' secs a = mapMaybe (withSeconds a) (secs' a secs)
+    enumSeconds' secs a = mapMaybe (withSecond a) (secs' a secs)
     secs' a = mapMaybe $ normalizeOrdinalIndex 60
+
+groupWith :: (Ord b) => (a -> b) -> [a] -> [[a]]
+groupWith f = groupBy (\a b -> f a == f b)
+
+nth :: [Int] -> [a] -> [a]
+nth ns as = map (as !!) $ map (pred) $ mapMaybe (normalizeOrdinalIndex (length as)) ns
+
+nth' ::
+  Ord b => 
+  (a -> b)
+  -> [Int]
+  -> [a]
+  -> Schedule a
+nth' f ns as = return $ concatMap (nth ns) $ groupWith f as
+
+nthMonth ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthMonth = nth' $ calendarYear . toCalendarTime
+
+nthDay ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthDay = nth' $ calendarMonth . toCalendarTime
+
+nthWeekDay ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthWeekDay ns as = do
+  sow <- asks startOfWeek
+  return $ 
+    concatMap (nth ns) $
+    concatMap (groupWith (weekNumber sow)) $
+    groupWith (calendarMonth . toCalendarTime) as 
+
+nthHour ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthHour = nth' $ calendarDay . toCalendarTime
+
+nthMinute ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthMinute = nth' $ calendarHour . toCalendarTime
+
+nthSecond ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthSecond = nth' $ calendarMinute . toCalendarTime
 {-
 -- | 'onMonths' computes the bounds for the 'month' given a 'moment', and
 -- returns a starting value and function to generate the moments with 'unfoldr'
