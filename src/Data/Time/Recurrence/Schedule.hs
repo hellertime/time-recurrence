@@ -8,12 +8,7 @@ module Data.Time.Recurrence.Schedule
     , recur
     , starting
     , begin
-{-
-    , every
-    , onMonths
-    , only
-    , byWeekDays
--}
+
     , enumMonths
     , enumDays
     , enumWeekDays
@@ -295,39 +290,3 @@ filterSeconds ::
   -> [a]
   -> Schedule a
 filterSeconds = filterCalendarTime calendarSecond
-
-{-
--- | 'onMonths' computes the bounds for the 'month' given a 'moment', and
--- returns a starting value and function to generate the moments with 'unfoldr'
-onMonths :: 
-  (CalendarTimeConvertible a, Moment a, Ord a) => 
-  Month 
-  -> (a -> Maybe (a, a))
-onMonths months = go months
-  go []     _  = Nothing
-  go (m:ms) m0 = do
-    m0    <- withDay moment 1
-    start <- withMonth m0 month
-    end   <- withDay start $ lastDayOfMonth start
-  return (start, \a0 -> if a0 <= end then Just (a0, step a0) else Nothing)
-  where step = next (toInterval 1) Days
-
--- | 'every' maps over the 'Moment's in the 'Schedule' and for each
--- 'Moment' it applys an unfold using the supplied function.
--- The associated list 
-every ::
-  Moment a => 
-  (a -> b -> (a, a -> Maybe (a, a))) 
-  -> [b] 
-  -> [a] 
-  -> Schedule a
-every f bs as = return $ concat [(uncurry $ flip L.unfoldr) (f a b) 
-                                | b <- bs
-                                , a <- as]
-
-byWeekDays :: (CalendarTimeConvertible a, Moment a) => [WeekDay] -> a -> Bool
-byWeekDays bs = flip elem bs . calendarWeekDay . toCalendarTime
-
-only :: Moment a => ([b] -> a -> Bool) -> [b] -> [a] -> Schedule a
-only f bs as = return $ filter (f bs) as
--}
