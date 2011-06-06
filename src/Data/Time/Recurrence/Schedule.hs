@@ -17,6 +17,7 @@ module Data.Time.Recurrence.Schedule
     , enumMonths
     , enumDays
     , enumWeekDays
+    , enumYearDays
     , enumHours
     , enumMinutes
     , enumSeconds
@@ -24,9 +25,18 @@ module Data.Time.Recurrence.Schedule
     , nthMonth
     , nthDay
     , nthWeekDay
+    , nthYearDay
     , nthHour
     , nthMinute
     , nthSecond
+
+    , filterMonths
+    , filterDays
+    , filterWeekDays
+    , filterYearDays
+    , filterHours
+    , filterMinutes
+    , filterSeconds
     )
   where
 
@@ -84,6 +94,16 @@ normalizeOrdinalIndex ub idx =
     else Just $ (idx + ub') `mod` ub'
   where
     ub' = ub + 1
+
+enumYearDays ::
+  (CalendarTimeConvertible a, Moment a) =>
+  [Int]
+  -> [a]
+  -> Schedule a
+enumYearDays days as = return $ concatMap (enumYearDays' days) as
+  where
+    enumYearDays' days a = mapMaybe (withYearDay a) (days' a days)
+    days' a = mapMaybe $ normalizeOrdinalIndex (daysInYear a)
 
 enumMonths :: 
   (CalendarTimeConvertible a, Moment a) => 
@@ -165,6 +185,13 @@ nth' ::
   -> Schedule a
 nth' f ns as = return $ concatMap (nth ns) $ groupWith f as
 
+nthYearDay ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthYearDay = nth' $ calendarYear . toCalendarTime
+
 nthMonth ::
   CalendarTimeConvertible a =>
   [Int]
@@ -211,6 +238,64 @@ nthSecond ::
   -> [a]
   -> Schedule a
 nthSecond = nth' $ calendarMinute . toCalendarTime
+
+filterCalendarTime ::
+  (CalendarTimeConvertible a, Eq b) =>
+  (CalendarTime -> b)
+  -> [b]
+  -> [a]
+  -> Schedule a
+filterCalendarTime f xs as = return $ filter (flip elem xs . f . toCalendarTime) as
+
+filterMonths ::
+  CalendarTimeConvertible a =>
+  [Month]
+  -> [a]
+  -> Schedule a
+filterMonths = filterCalendarTime calendarMonth
+
+filterYearDays ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+filterYearDays = filterCalendarTime calendarYearDay
+
+filterDays ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+filterDays = filterCalendarTime calendarDay
+
+filterWeekDays ::
+  CalendarTimeConvertible a => 
+  [WeekDay]
+  -> [a]
+  -> Schedule a
+filterWeekDays = filterCalendarTime calendarWeekDay
+
+filterHours ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+filterHours = filterCalendarTime calendarHour
+
+filterMinutes ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+filterMinutes = filterCalendarTime calendarMinute
+
+filterSeconds ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+filterSeconds = filterCalendarTime calendarSecond
+
 {-
 -- | 'onMonths' computes the bounds for the 'month' given a 'moment', and
 -- returns a starting value and function to generate the moments with 'unfoldr'
