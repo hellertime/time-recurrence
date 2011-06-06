@@ -5,6 +5,7 @@ module Data.Time.CalendarTime.CalendarTime
     , toDay
     , withDay
     , toTimeOfDay
+    , daysInYear
     , lastDayOfMonth
     , weekNumber
 
@@ -100,6 +101,10 @@ instance CalendarTimeConvertible ZonedTime where
     day <- toDay t
     time <- toTimeOfDay t
     return $ ZonedTime (LocalTime day time) (calendarTimeZone t)
+
+daysInYear :: (CalendarTimeConvertible a) => a -> Int
+daysInYear t = let ct = toCalendarTime t
+  in if isLeapYear $ calendarYear ct then 366 else 365
 
 lastDayOfMonth :: (CalendarTimeConvertible a) => a -> Int
 lastDayOfMonth t = let ct = toCalendarTime t
