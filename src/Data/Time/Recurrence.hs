@@ -1,15 +1,12 @@
 module Data.Time.Recurrence
     (
       CalendarTime (..)
-    , module Data.Time.Calendar.Month
-    , module Data.Time.Calendar.WeekDay
-    , module Data.Time.Moment
-    , module Data.Time.Recurrence.Schedule
+    , module ReExport
     )
   where
 
 import Data.Time.CalendarTime
-import Data.Time.Calendar.Month
-import Data.Time.Calendar.WeekDay
-import Data.Time.Moment
-import Data.Time.Recurrence.Schedule 
+import Data.Time.Calendar.Month as ReExport
+import Data.Time.Calendar.WeekDay as ReExport
+import Data.Time.Moment as ReExport
+import Data.Time.Recurrence.Schedule as ReExport

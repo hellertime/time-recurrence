@@ -64,13 +64,26 @@ withDay ct day = ct
   where
     (y, m, d) = toGregorian day
 
+dayInfo :: 
+  Day 
+  -> ( Integer -- ^ Year
+     , Int     -- ^ Month
+     , Int     -- ^ Day
+     , WeekDay -- ^ Week Day
+     , Int     -- ^ Year Day
+     )
+dayInfo day = let
+  (y, m, d) = toGregorian day
+  weekDay   = toEnum $ snd (mondayStartWeek day) - 1
+  yearDay   = snd $ toOrdinalDate day
+  in (y, m, d, weekDay, yearDay)
+  
+
 instance CalendarTimeConvertible UTCTime where
   toCalendarTime (UTCTime utcDay utcTime) = CalendarTime (fromEnum ss) mm hh d (toEnum m) y weekDay yearDay utc
     where
       (TimeOfDay hh mm ss) = timeToTimeOfDay utcTime
-      (y, m, d) = toGregorian utcDay
-      yearDay = snd $ toOrdinalDate utcDay
-      weekDay = toEnum $ snd (mondayStartWeek utcDay) - 1
+      (y, m, d, weekDay, yearDay) = dayInfo utcDay
 
   fromCalendarTime t = do
     day <- toDay t
@@ -80,9 +93,7 @@ instance CalendarTimeConvertible UTCTime where
 instance CalendarTimeConvertible LocalTime where
   toCalendarTime (LocalTime day t) = CalendarTime (fromEnum $ todSec t) (todMin t) (todHour t) d (toEnum m) y weekDay yearDay tz
     where
-      (y, m , d) = toGregorian day
-      yearDay = snd $ toOrdinalDate day
-      weekDay = toEnum $ snd (mondayStartWeek day) - 1
+      (y, m, d, weekDay, yearDay) = dayInfo day
       tz = unsafePerformIO getCurrentTimeZone
 
   fromCalendarTime t = do
@@ -93,9 +104,7 @@ instance CalendarTimeConvertible LocalTime where
 instance CalendarTimeConvertible ZonedTime where
   toCalendarTime (ZonedTime (LocalTime day t) tz) = CalendarTime (fromEnum $ todSec t) (todMin t) (todHour t) d (toEnum m) y weekDay yearDay tz
     where
-      (y, m, d) = toGregorian day
-      yearDay = snd $ toOrdinalDate day
-      weekDay = toEnum $ snd (mondayStartWeek day) - 1
+      (y, m, d, weekDay, yearDay) = dayInfo day
 
   fromCalendarTime t = do
     day <- toDay t

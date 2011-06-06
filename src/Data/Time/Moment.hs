@@ -1,13 +1,10 @@
 module Data.Time.Moment
     (
-      module Data.Time.Moment.Interval
-    , module Data.Time.Moment.Moment
-    , module Data.Time.Moment.StartOfWeek
-    , module Data.Time.Moment.UTC
+      module ReExport
     )
   where
 
-import Data.Time.Moment.Interval
-import Data.Time.Moment.Moment
-import Data.Time.Moment.StartOfWeek
-import Data.Time.Moment.UTC
+import Data.Time.Moment.Interval as ReExport
+import Data.Time.Moment.Moment as ReExport
+import Data.Time.Moment.StartOfWeek as ReExport
+import Data.Time.Moment.UTC as ReExport

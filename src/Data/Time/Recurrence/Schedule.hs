@@ -75,7 +75,7 @@ starting :: (Ord a, Moment a) =>
 starting im m0 = dropWhile (< m0) . O.nub . repeatSchedule im{moment=m0}
 
 begin :: (Ord a, Moment a) => InitialMoment a -> a -> [a]
-begin im m0 = starting im m0 (return)
+begin im m0 = starting im m0 return
 
 -- | Normalize an bounded ordinal index
 --   Pass an upper-bound 'ub' and an index 'idx'
@@ -129,12 +129,12 @@ enumWeekDays wdays as = return $ concatMap (enumWeekDays' wdays) as
     enumWeekDays' :: (CalendarTimeConvertible a, Moment a) => [WeekDay] -> a -> [a]
     enumWeekDays' wdays a0 = let
       m0 = calendarMonth $ toCalendarTime a0
-      in flip unfoldr (a0,cycle wdays) (\(a, (w:ws)) -> let
+      in unfoldr (\(a, w:ws) -> let
            a'       = advanceToWeekDay a w
-           in if m0 == (calendarMonth $ toCalendarTime a)
+           in if m0 == calendarMonth (toCalendarTime a)
                 then Just (a, (a', ws))
                 else Nothing
-          )
+          ) (a0,cycle wdays) 
 
 enumHours ::
   (CalendarTimeConvertible a, Moment a) =>
@@ -170,7 +170,7 @@ groupWith :: (Ord b) => (a -> b) -> [a] -> [[a]]
 groupWith f = groupBy (\a b -> f a == f b)
 
 nth :: [Int] -> [a] -> [a]
-nth ns as = map (as !!) $ map (pred) $ mapMaybe (normalizeOrdinalIndex (length as)) ns
+nth ns as = map ((as !!) . pred) $ mapMaybe (normalizeOrdinalIndex (length as)) ns
 
 nth' ::
   Ord b => 
