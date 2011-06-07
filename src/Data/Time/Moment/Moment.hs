@@ -35,12 +35,9 @@ module Data.Time.Moment.Moment
     )
   where
 
-import Debug.Trace
-
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.OrdinalDate
 import Data.Time.Calendar.WeekDay
-import Data.Time.Calendar.WeekDate
 import Data.Time.CalendarTime hiding (withDay)
 import qualified Data.Time.CalendarTime as CT
 import Data.Time.Moment.Interval
