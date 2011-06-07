@@ -20,6 +20,7 @@ module Data.Time.Recurrence.Schedule
 
     , nthMonth
     , nthDay
+    , nthWeekDay
     , nthWeekDayOfWeek
     , nthWeekDayOfMonth
     , nthYearDay
@@ -228,6 +229,13 @@ nthWeekDayOfMonth ::
   -> [a]
   -> Schedule a
 nthWeekDayOfMonth = nth' $ calendarMonth . toCalendarTime
+
+nthWeekDay ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthWeekDay = nth' $ calendarYear . toCalendarTime
 
 nthHour ::
   CalendarTimeConvertible a =>
