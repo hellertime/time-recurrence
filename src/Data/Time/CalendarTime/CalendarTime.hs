@@ -34,7 +34,7 @@ data CalendarTime = CalendarTime
     , calendarWeekDay  :: WeekDay
     , calendarYearDay  :: Int
     , calendarTimeZone :: TimeZone
-} deriving (Eq,Ord)
+} deriving (Eq,Ord,Show)
 
 -- | The class of types which can be converted to a 'CalendarTime'
 class CalendarTimeConvertible t where
