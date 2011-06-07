@@ -17,7 +17,6 @@ module Data.Time.CalendarTime.CalendarTime
 import Data.Time
 import Data.Time.Calendar.OrdinalDate
 import Data.Time.Calendar.Month
-import Data.Time.Calendar.MonthDay
 import Data.Time.Calendar.WeekDay
 import Data.Time.Moment.StartOfWeek
 import System.IO.Unsafe
@@ -117,7 +116,7 @@ daysInYear t = let ct = toCalendarTime t
 
 lastDayOfMonth :: (CalendarTimeConvertible a) => a -> Int
 lastDayOfMonth t = let ct = toCalendarTime t
-  in monthLength (isLeapYear $ calendarYear ct) (fromEnum $ calendarMonth ct)
+  in gregorianMonthLength (calendarYear ct) (fromEnum $ calendarMonth ct)
 
 weekNumber :: (CalendarTimeConvertible a) => StartOfWeek -> a -> Maybe Int
 weekNumber _  t = do
