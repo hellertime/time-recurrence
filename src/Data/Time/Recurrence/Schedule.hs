@@ -11,7 +11,8 @@ module Data.Time.Recurrence.Schedule
 
     , enumMonths
     , enumDays
-    , enumWeekDays
+    , enumWeekDaysInWeek
+    , enumWeekDaysInMonth
     , enumYearDays
     , enumHours
     , enumMinutes
@@ -19,7 +20,8 @@ module Data.Time.Recurrence.Schedule
 
     , nthMonth
     , nthDay
-    , nthWeekDay
+    , nthWeekDayOfWeek
+    , nthWeekDayOfMonth
     , nthYearDay
     , nthHour
     , nthMinute
@@ -38,7 +40,7 @@ module Data.Time.Recurrence.Schedule
 import Control.Monad.Reader
 import Data.List as L
 import Data.List.Ordered as O
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromJust)
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
 import Data.Time.CalendarTime hiding (withDay)
@@ -119,23 +121,30 @@ enumDays days as = return $ concatMap (enumDays' days) as
     enumDays' days a = mapMaybe (withDay a) (days' a days)
     days' a = mapMaybe $ normalizeOrdinalIndex (lastDayOfMonth a)
 
-enumWeekDays ::
+enumWeekDaysInWeek ::
   (CalendarTimeConvertible a, Moment a) =>
   [WeekDay]
   -> [a]
   -> Schedule a
-enumWeekDays wdays as = return $ concatMap (enumWeekDays' wdays) as
+enumWeekDaysInWeek wdays as = return $ concatMap (enumWeekDays' wdays) as
   where
     enumWeekDays' :: (CalendarTimeConvertible a, Moment a) => [WeekDay] -> a -> [a]
     enumWeekDays' wdays a0 = let
-      m0 = calendarMonth $ toCalendarTime a0
-      in unfoldr (\(a, w:ws) -> let
-           a'       = advanceToWeekDay a w
-           in if m0 == calendarMonth (toCalendarTime a)
-                then Just (a, (a', ws))
-                else Nothing
-          ) (a0,cycle wdays) 
+      w0     = calendarWeekDay $ toCalendarTime a0
+      wdays' = dropWhile (/= w0) $ O.nubSort wdays
+      in map (advanceToWeekDay a0) wdays'
 
+enumWeekDaysInMonth ::
+  (CalendarTimeConvertible a, Moment a) =>
+  [WeekDay]
+  -> [a]
+  -> Schedule a
+enumWeekDaysInMonth wdays as = return $ concatMap (enumWeekDays' wdays) as
+  where
+    enumWeekDays' wdays a = let
+      mdays  = mapMaybe (withDay a) [1 .. lastDayOfMonth a]
+      in filter (flip elem wdays . calendarWeekDay . toCalendarTime) mdays
+      
 enumHours ::
   (CalendarTimeConvertible a, Moment a) =>
   [Int]
@@ -201,17 +210,24 @@ nthDay ::
   -> Schedule a
 nthDay = nth' $ calendarMonth . toCalendarTime
 
-nthWeekDay ::
+nthWeekDayOfWeek ::
   CalendarTimeConvertible a =>
   [Int]
   -> [a]
   -> Schedule a
-nthWeekDay ns as = do
+nthWeekDayOfWeek ns as = do
   sow <- asks startOfWeek
   return $ 
     concatMap (nth ns) $
     concatMap (groupWith (weekNumber sow)) $
     groupWith (calendarMonth . toCalendarTime) as 
+
+nthWeekDayOfMonth ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> Schedule a
+nthWeekDayOfMonth = nth' $ calendarMonth . toCalendarTime
 
 nthHour ::
   CalendarTimeConvertible a =>
