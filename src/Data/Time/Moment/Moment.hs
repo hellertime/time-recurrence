@@ -35,6 +35,8 @@ module Data.Time.Moment.Moment
     )
   where
 
+import Debug.Trace
+
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.OrdinalDate
 import Data.Time.Calendar.WeekDay
@@ -152,13 +154,18 @@ withMonth t m = fromCalendarTime (toCalendarTime t){calendarMonth = m}
 withYear :: (CalendarTimeConvertible a, Moment a) => a -> Integer -> Maybe a
 withYear t y = fromCalendarTime (toCalendarTime t){calendarYear = y}
 
-advanceToWeekDay :: (CalendarTimeConvertible a, Moment a) => a -> WeekDay -> a
+advanceToWeekDay :: 
+  (CalendarTimeConvertible a, Moment a) => 
+  a -> 
+  WeekDay -> 
+  a
 advanceToWeekDay t d = let
-  ct = toCalendarTime t
-  d0 = calendarWeekDay ct
-  in if d0 == d 
-    then t 
-    else addDays t $ toInteger $ 1 + (fromEnum d - fromEnum Monday) `mod` 6
+  ct  = toCalendarTime t
+  d0  = calendarWeekDay ct
+  d'  = fromEnum d
+  d0' = fromEnum d0
+  delta = toInteger $ d' - d0' `mod` 7
+  in addDays t $ if delta == 0 then 7 else delta
 
 -- | The @InitialMoment@ datatype
 
