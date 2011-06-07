@@ -65,11 +65,11 @@ withDay ct day = ct
 
 dayInfo :: 
   Day 
-  -> ( Integer -- ^ Year
-     , Int     -- ^ Month
-     , Int     -- ^ Day
-     , WeekDay -- ^ Week Day
-     , Int     -- ^ Year Day
+  -> ( Integer -- Year
+     , Int     -- Month
+     , Int     -- Day
+     , WeekDay -- Week Day
+     , Int     -- Year Day
      )
 dayInfo day = let
   (y, m, d) = toGregorian day
