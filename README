@@ -79,25 +79,25 @@ Monthly on the first Friday for 10 occurrences:
 
 > take 10 $ recur monthly `starting` sep1997 $
 >   enumWeekDaysInMonth [Friday] >=>
->   nthWeekDayInMonth [1]
+>   nthWeekDayOfMonth [1]
 
 Monthly on the first Friday until Dec. 24, 1997
 
 > takeWhile (<= dec1997) $ recur monthly `starting` sep1997 $
 >   enumWeekDaysInMonth [Friday] >=>
->   nthWeekDayInMonth [1]
+>   nthWeekDayOfMonth [1]
 
 Every other month on the first and last Sunday of the month for 10 occurrences:
 
 > take 10 $ recur monthly `by` 2 `starting` sep1997 $
 >   enumWeekDaysInMonth [Sunday] >=>
->   nthWeekDayInMonth [1,-1]
+>   nthWeekDayOfMonth [1,-1]
 
 Monthly on the second-to-last Monday of the month for 6 months:
 
 > take 6 $ recur monthly `starting` sep1997 $
 >   enumWeekDaysInMonth [Monday] >=>
->   nthWeekDayInMonth [-2]
+>   nthWeekDayOfMonth [-2]
 
 Monthly on the third-to-last day of the month, forever:
 
@@ -186,7 +186,7 @@ The third instance into the month of one of Tuesday, Wednesday, or Thursday, for
 
 > take 3 $ recur monthly `starting` sep1997 $
 >   enumWeekDaysInMonth [Tuesday .. Thursday] >=>
->   nthWeekDayInMonth [3]
+>   nthWeekDayOfMonth [3]
 
 The second-to-last weekday of the month:
 
