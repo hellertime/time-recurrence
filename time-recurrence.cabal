@@ -7,7 +7,7 @@ Name:                time-recurrence
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.6
+Version:             0.6.1
 
 -- A short (one-line) description of the package.
 Synopsis:            Generate recurring dates.
@@ -61,7 +61,7 @@ flag test-suite
 
 Library
   hs-source-dirs:      src
-  ghc-options:         -Wall -fno-warn-name-shadowing
+  ghc-options:         -Wall -fno-warn-name-shadowing -fno-warn-orphans
 
   -- Modules exported by the library.
   Exposed-modules:
@@ -96,7 +96,7 @@ Test-Suite test-time-recurrence
   type:                 exitcode-stdio-1.0
   hs-source-dirs:       src, tests
   main-is:              Tests.lhs
-  ghc-options:          -Wall -fno-warn-name-shadowing
+  ghc-options:          -Wall -fno-warn-name-shadowing -fno-warn-orphans
   build-depends:        base >= 4 && < 5,
                         time >= 1.4.0.1 && < 1.5,
                         data-ordlist >= 0.4 && < 0.4.5,

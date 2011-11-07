@@ -19,7 +19,6 @@ import Data.Time.Calendar.OrdinalDate
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
 import Data.Time.Moment.StartOfWeek
-import System.IO.Unsafe
 
 -- | A representation of calendar time separated into year, month, day, and so on.
 data CalendarTime = CalendarTime 
@@ -39,13 +38,11 @@ data CalendarTime = CalendarTime
 class CalendarTimeConvertible t where
   -- | Convert to a 'CalendarTime'
   toCalendarTime :: t -> CalendarTime
-  toCalendarTimeWithTimeZone :: t -> TimeZone -> CalendarTime
   -- | Convert from a 'CalendarTime'
   fromCalendarTime :: CalendarTime -> Maybe t
 
 instance CalendarTimeConvertible CalendarTime where
   toCalendarTime = id
-  toCalendarTimeWithTimeZone ct tz = ct { calendarTimeZone = tz }
   fromCalendarTime = Just . id
 
 -- | Convert to a 'Day'
@@ -86,32 +83,15 @@ instance CalendarTimeConvertible UTCTime where
       (TimeOfDay hh mm ss) = timeToTimeOfDay utcTime
       (y, m, d, weekDay, yearDay) = dayInfo utcDay
 
-  toCalendarTimeWithTimeZone utcTime tz | tz == utc = toCalendarTime utcTime
-                                        | otherwise = error ("UTCTime.toCalendarTimeWithTimeZone cannot be represented with time zone " ++ show tz)
-
   fromCalendarTime t = do
     day <- toDay t
     time <- toTimeOfDay t
     return $ UTCTime day (timeOfDayToTime time)
 
-instance CalendarTimeConvertible LocalTime where
-  toCalendarTime _ = error ("LocalTime.toCalendarTime cannot be represented without a time zone")
-
-  toCalendarTimeWithTimeZone (LocalTime day t) tz = CalendarTime (fromEnum $ todSec t) (todMin t) (todHour t) d (toEnum m) y weekDay yearDay tz
-    where
-      (y, m, d, weekDay, yearDay) = dayInfo day
-
-  fromCalendarTime t = do
-    day <- toDay t
-    time <- toTimeOfDay t
-    return $ LocalTime day time
-
 instance CalendarTimeConvertible ZonedTime where
   toCalendarTime (ZonedTime (LocalTime day t) tz) = CalendarTime (fromEnum $ todSec t) (todMin t) (todHour t) d (toEnum m) y weekDay yearDay tz
     where
       (y, m, d, weekDay, yearDay) = dayInfo day
-
-  toCalendarTimeWithTimeZone (ZonedTime lt _) tz = toCalendarTime (ZonedTime lt tz)
 
   fromCalendarTime t = do
     day <- toDay t
