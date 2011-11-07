@@ -24,6 +24,7 @@ into UTC.
 We are certain of the validity of the dates used, and so fromJust is safe
 to use.
 
+> date1, date2, date3, date4 :: UTCTime
 > parse822Time :: String -> UTCTime
 > parse822Time = zonedTimeToUTC 
 >              . fromJust 
