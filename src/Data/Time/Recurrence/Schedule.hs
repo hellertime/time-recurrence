@@ -41,7 +41,7 @@ module Data.Time.Recurrence.Schedule
 import Control.Monad.Reader
 import Data.List as L
 import Data.List.Ordered as O
-import Data.Maybe (mapMaybe, fromJust)
+import Data.Maybe (mapMaybe)
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
 import Data.Time.CalendarTime hiding (withDay)
@@ -154,7 +154,7 @@ enumHours ::
 enumHours hours as = return $ concatMap (enumHours' hours) as
   where
     enumHours' hours a = mapMaybe (withHour a) (hours' a hours)
-    hours' a = mapMaybe $ normalizeOrdinalIndex 23
+    hours' _ = mapMaybe $ normalizeOrdinalIndex 23
 
 enumMinutes ::
   (CalendarTimeConvertible a, Moment a) =>
@@ -164,7 +164,7 @@ enumMinutes ::
 enumMinutes ms as = return $ concatMap (enumMinutes' ms) as
   where
     enumMinutes' ms a = mapMaybe (withMinute a) (ms' a ms)
-    ms' a = mapMaybe $ normalizeOrdinalIndex 59
+    ms' _ = mapMaybe $ normalizeOrdinalIndex 59
 
 enumSeconds ::
   (CalendarTimeConvertible a, Moment a) => 
@@ -174,7 +174,7 @@ enumSeconds ::
 enumSeconds secs as = return $ concatMap (enumSeconds' secs) as
   where
     enumSeconds' secs a = mapMaybe (withSecond a) (secs' a secs)
-    secs' a = mapMaybe $ normalizeOrdinalIndex 60
+    secs' _ = mapMaybe $ normalizeOrdinalIndex 60
 
 groupWith :: (Ord b) => (a -> b) -> [a] -> [[a]]
 groupWith f = groupBy (\a b -> f a == f b)
