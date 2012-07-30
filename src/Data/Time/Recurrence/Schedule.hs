@@ -46,8 +46,8 @@ import Data.Maybe (mapMaybe)
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
 import Data.Time.CalendarTime hiding (withDay)
-import Data.Time.Moment hiding (interval, startOfWeek)
-import qualified Data.Time.Moment as M (interval, startOfWeek)
+import Data.Time.Moment hiding (interval, startOfWeek, Period)
+import qualified Data.Time.Moment as M (interval, startOfWeek, Period)
 
 type Schedule a = Reader (InitialMoment a) [a]
 
@@ -108,16 +108,48 @@ data Schedule' a where
 
 deriving instance Show (Schedule' a)
 
+data EnumSet
+    = TheSeconds [Second]
+    | TheMinutes [Minute]
+    | TheHours   [Hour]
+    | TheWeekDaysInWeek [WeekDay]
+    | TheWeeksDayInMonth [WeekDay]
+    | TheDays [Day]
+    | TheMonths [Month]
+    | TheYearDays [YearDay]
+  deriving (Show)
+
+data FilterSet
+    = OnSeconds [Second]
+    | OnMinutes [Minute]
+    | OnHours [Hour]
+    | OnWeekDays [WeekDay]
+    | OnDays [Day]
+    | OnMonths [Month]
+    | OnYearDays [YearDay]
+  deriving (Show)
+
+data SelectSet
+    = FromSeconds [Int]
+    | FromMinutes [Int]
+    | FromHours [Int]
+    | FromWeekDaysInWeek [Int]
+    | FromWeekDaysInMonth [Int]
+    | FromDays [Int]
+    | FromMonths [Int]
+    | FromYearDays [Int]
+  deriving (Show)
+
 data ScheduleDetails a where
-    Enumerate :: NominalPeriodSelector -> ScheduleDetails NominalPeriodSelector
-    Filter    :: NominalPeriodFilter -> ScheduleDetails NominalPeriodFilter
-    Select    :: OrdinalPeriodSelector -> ScheduleDetails OrdinalPeriodSelector
-    :&        :: ScheduleDetails NominalPeriodSelector -> ScheduleDetails NominalPeriodSelector -> ScheduleDetails NominalPeriodSelector
-    :|        :: ScheduleDetails NominalPeriodFilter -> ScheduleDetails NominalPeriodFilter -> ScheduleDetails NominalPeriodFilter
-    :!!       :: ScheduleDetails OrdinalPeriodSelector -> ScheduleDetails OrdinalPeriodSelector -> ScheduleDetails OrdinalPeriodFilter
-    :>        :: ScheduleDetails NominalPeriodSelector -> ScheduleDetails NominalPeriodFilter -> ScheduleDetails NominalPeriodFilter
-    :>>       :: ScheduleDetails NominalPeriodFilter -> ScheduleDetails OrdinalPeriodSelector -> ScheduleDetails OrdinalPeriodSelector
-    :>>>      :: ScheduleDetails NominalPeriodSelector -> ScheduleDetails OrdinalPeriodSelector -> ScheduleDetails OrdinalPeriodSelector
+    Enumerate :: EnumSet -> ScheduleDetails EnumSet
+    Filter    :: FilterSet -> ScheduleDetails FilterSet
+    Select    :: SelectSet -> ScheduleDetails SelectSet
+    :&        :: ScheduleDetails EnumSet -> ScheduleDetails EnumSet -> ScheduleDetails EnumSet
+    :|        :: ScheduleDetails FilterSet -> ScheduleDetails FilterSet -> ScheduleDetails FilterSet
+    :!!       :: ScheduleDetails SelectSet -> ScheduleDetails SelectSet -> ScheduleDetails OrdinalPeriodFilter
+    :>        :: ScheduleDetails EnumSet -> ScheduleDetails FilterSet -> ScheduleDetails FilterSet
+    :>>       :: ScheduleDetails FilterSet -> ScheduleDetails SelectSet -> ScheduleDetails SelectSet
+    :>>>      :: ScheduleDetails EnumSet -> ScheduleDetails SelectSet -> ScheduleDetails SelectSet
 
 deriving instance Show (ScheduleDetails a)
 
@@ -125,7 +157,7 @@ compile :: (Ord a, Moment a) => Schedule' -> a -> ([a] -> FutureMoments a)
 compile (Then recur details m0) = starting (mkIM recur) m0 $ compile' details
 compile recur                   = begin (mkIM recur) m0 return
   where
-    mkIM' :: Moment a => Period -> Interval -> StartOfWeek -> InitialMoment a
+    mkIM' :: Moment a => M.Period -> Interval -> StartOfWeek -> InitialMoment a
     mkIM' per int sow = InitialMoment per int sow epoch
     mkIM :: Moment a => (Freq -> Schedule' Freq) -> InitialMoment a
     mkIM (Recur freq int sow) =
