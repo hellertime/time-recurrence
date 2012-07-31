@@ -7,11 +7,6 @@ module Data.Time.Recurrence.Schedule
     (
       -- * Schedule
       Schedule (..)
-    , ScheduleDetails (..)
-
-    , EnumSet (..)
-    , FilterSet (..)
-    , SelectSet (..)
 
       -- * Freq
     , Freq (..)
@@ -31,6 +26,9 @@ module Data.Time.Recurrence.Schedule
 
       -- * evaluate a Schedule into a function
     , eval
+
+      -- * run an evaluated Schedule from a moment
+    , starting
     )
   where
 
@@ -40,6 +38,7 @@ import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
 import Data.Time.CalendarTime
 import Data.Time.Moment hiding (interval, startOfWeek)
+import Data.Time.Recurrence.ScheduleDetails
 
 data Freq
     = Secondly { interval :: Interval, startOfWeek :: StartOfWeek }
@@ -94,87 +93,33 @@ data Schedule a where
 
 deriving instance Show (Schedule a)
 
-type Second = Int
-type Minute = Int
-type Hour = Int
-type Day = Int
-type YearDay = Int
-
-data EnumSet
-    = TheSeconds [Second]
-    | TheMinutes [Minute]
-    | TheHours   [Hour]
-    | TheWeekDaysInWeek [WeekDay]
-    | TheWeekDaysInMonth [WeekDay]
-    | TheDays [Day]
-    | TheMonths [Month]
-    | TheYearDays [YearDay]
-  deriving (Read, Show)
-
-data FilterSet
-    = OnSeconds [Second]
-    | OnMinutes [Minute]
-    | OnHours [Hour]
-    | OnWeekDays [WeekDay]
-    | OnDays [Day]
-    | OnMonths [Month]
-    | OnYearDays [YearDay]
-  deriving (Read, Show)
-
-data SelectSet
-    = FromSeconds [Int]
-    | FromMinutes [Int]
-    | FromHours [Int]
-    | FromWeekDaysInWeek [Int]
-    | FromWeekDaysInMonth [Int]
-    | FromDays [Int]
-    | FromMonths [Int]
-    | FromYearDays [Int]
-  deriving (Read, Show)
-
-infixr 5 :&, :|, :!!
-infixr 0 :>, :>>, :>>>
-
-data ScheduleDetails a where
-    Enumerate :: EnumSet -> ScheduleDetails EnumSet
-    Filter    :: FilterSet -> ScheduleDetails FilterSet
-    Select    :: SelectSet -> ScheduleDetails SelectSet
-    (:&)      :: ScheduleDetails EnumSet -> ScheduleDetails EnumSet -> ScheduleDetails EnumSet
-    (:|)      :: ScheduleDetails FilterSet -> ScheduleDetails FilterSet -> ScheduleDetails FilterSet
-    (:!!)     :: ScheduleDetails SelectSet -> ScheduleDetails SelectSet -> ScheduleDetails SelectSet
-    (:>)      :: ScheduleDetails EnumSet -> ScheduleDetails FilterSet -> ScheduleDetails FilterSet
-    (:>>)     :: ScheduleDetails FilterSet -> ScheduleDetails SelectSet -> ScheduleDetails SelectSet
-    (:>>>)    :: ScheduleDetails EnumSet -> ScheduleDetails SelectSet -> ScheduleDetails SelectSet
-
-deriving instance Show (ScheduleDetails a)
-
 eval' :: (CalendarTimeConvertible a, Ord a, Moment a) => ScheduleDetails b -> ([a] -> FutureMoments a)
 eval' (Enumerate x) = case x of
-    (TheSeconds ss)         -> enumSeconds ss
-    (TheMinutes mm)         -> enumMinutes mm
-    (TheHours hh)           -> enumHours hh
-    (TheWeekDaysInWeek ww)  -> enumWeekDaysInWeek ww
-    (TheWeekDaysInMonth ww) -> enumWeekDaysInMonth ww
-    (TheDays dd)            -> enumDays dd
-    (TheMonths mm)          -> enumMonths mm
-    (TheYearDays yy)        -> enumYearDays yy
+    (EPSeconds ss)         -> enumSeconds ss
+    (EPMinutes mm)         -> enumMinutes mm
+    (EPHours hh)           -> enumHours hh
+    (EPWeekDaysInWeek ww)  -> enumWeekDaysInWeek ww
+    (EPWeekDaysInMonth ww) -> enumWeekDaysInMonth ww
+    (EPDays dd)            -> enumDays dd
+    (EPMonths mm)          -> enumMonths mm
+    (EPYearDays yy)        -> enumYearDays yy
 eval' (Filter x) = case x of
-    (OnSeconds ss)  -> filterSeconds ss
-    (OnMinutes mm)  -> filterMinutes mm
-    (OnHours hh)    -> filterHours hh
-    (OnWeekDays ww) -> filterWeekDays ww
-    (OnDays dd)     -> filterDays dd
-    (OnMonths mm)   -> filterMonths mm
-    (OnYearDays yy) -> filterYearDays yy
+    (FPSeconds ss)  -> filterSeconds ss
+    (FPMinutes mm)  -> filterMinutes mm
+    (FPHours hh)    -> filterHours hh
+    (FPWeekDays ww) -> filterWeekDays ww
+    (FPDays dd)     -> filterDays dd
+    (FPMonths mm)   -> filterMonths mm
+    (FPYearDays yy) -> filterYearDays yy
 eval' (Select x) = case x of
-    (FromSeconds ss)         -> nthSecond ss
-    (FromMinutes mm)         -> nthMinute mm
-    (FromHours hh)           -> nthHour hh
-    (FromWeekDaysInWeek ww)  -> nthWeekDayOfWeek ww
-    (FromWeekDaysInMonth ww) -> nthWeekDayOfMonth ww
-    (FromDays dd)            -> nthDay dd
-    (FromMonths mm)          -> nthDay mm
-    (FromYearDays yy)        -> nthYearDay yy
+    (SPSeconds ss)         -> nthSecond ss
+    (SPMinutes mm)         -> nthMinute mm
+    (SPHours hh)           -> nthHour hh
+    (SPWeekDaysInWeek ww)  -> nthWeekDayOfWeek ww
+    (SPWeekDaysInMonth ww) -> nthWeekDayOfMonth ww
+    (SPDays dd)            -> nthDay dd
+    (SPMonths mm)          -> nthDay mm
+    (SPYearDays yy)        -> nthYearDay yy
 eval' ((:&) x y)   = eval' x >=> eval' y
 eval' ((:|) x y)   = eval' x >=> eval' y
 eval' ((:!!) x y)  = eval' x >=> eval' y
@@ -183,8 +128,11 @@ eval' ((:>>) x y)  = eval' x >=> eval' y
 eval' ((:>>>) x y) = eval' x >=> eval' y
 
 eval :: (CalendarTimeConvertible a, Ord a, Moment a) => Schedule b -> (a -> [a])
-eval (Then recur details) = flip (starting $ mkIM recur) $ eval' details
-eval recur@(Recur _)      = begin $ mkIM recur
+eval (Then recur details) = flip (startWith $ mkIM recur) $ eval' details
+eval recur@(Recur _)      = start $ mkIM recur
+
+starting :: (CalendarTimeConvertible a, Ord a, Moment a) => a -> Schedule b -> [a]
+starting m0 sch = (eval sch) m0
 
 mkIM :: Moment a => Schedule Freq -> InitialMoment a
 mkIM (Recur freq) =
@@ -199,15 +147,15 @@ mkIM (Recur freq) =
     mkIM' :: Moment a => Period -> Interval -> StartOfWeek -> InitialMoment a
     mkIM' per int sow = InitialMoment per int sow epoch
 
--- | 'starting' is an infinite list of 'Moment's, where no 'Moment' 
+-- | 'startWith' is an infinite list of 'Moment's, where no 'Moment' 
 -- occurrs before the 'InitialMoment'. The list is further refined
 -- by the passed in function.
-starting :: (Ord a, Moment a) => 
+startWith :: (Ord a, Moment a) => 
   InitialMoment a 
   -> a 
   -> ([a] -> FutureMoments a)
   -> [a]
-starting im m0 = dropWhile (< m0) . O.nub . iterateFutureMoments im{moment=m0}
+startWith im m0 = dropWhile (< m0) . O.nub . iterateFutureMoments im{moment=m0}
 
-begin :: (Ord a, Moment a) => InitialMoment a -> a -> [a]
-begin im m0 = starting im m0 return
+start :: (Ord a, Moment a) => InitialMoment a -> a -> [a]
+start im m0 = startWith im m0 return
