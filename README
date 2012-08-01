@@ -20,152 +20,186 @@ Examples:
 
 Daily for 10 occurrences:
 
-> take 10 $ starting sep1997 $ Recur daily
+> take 10 $ starting sep1997 $ recur daily
 
 Daily until Dec. 24, 1997:
 
-> takeWhile (<= dec1997) $ starting sep1997 $ Recur daily
+> takeWhile (<= dec1997) $ starting sep1997 $ recur daily
 
 Every other day - forever:
 
-> starting sep1997 $ Recur daily `by` 2
+> starting sep1997 $ recur daily `by` 2
 
 Every 10 days, 5 occurrences:
 
-> take 5 $ starting sep1997 $ Recur daily `by` 10
+> take 5 $ starting sep1997 $ recur daily `by` 10
 
 Every day in January, for 3 years:
 
-> takeWhile (<= jan2000) $ starting jan1998 $ Recur yearly :$
->   Enumerate . TheMonths $ [January] :>
->   Filter . OnWeekDays $ [Monday .. Sunday]
+> takeWhile (<= jan2000) $ starting jan1998 $
+>   recur yearly
+>   >==> enum (Months [January])
+>   >==> filter (WeekDays [Monday .. Sunday])
 
-> takeWhile (<= jan2000) $ eval (Recur daily $ Enumerate $ TheMonths [January]) jan1998
+> takeWhile (<= jan2000) $ starting jan1998 $
+>   recur daily 
+>   >==> enum (Months [January])
 
 Weekly for 10 occurrences:
 
-> take 10 $ recur weekly `begin` sep1997
+> take 10 $ starting sep1997 $ recur weekly
 
 Weekly until Dec. 24, 1997:
 
-> takeWhile (<= dec1997) $ recur weekly `withStartOfWeek` Sunday `begin` sep1997
+> takeWhile (<= dec1997) $ starting sep1997 $
+>   recur weekly `withStartOfWeek` Sunday
 
 Every other week - forever:
 
-> recur weekly `by` 2 `begin` sep1997
+> starting sep1997 $ recur weekly `by` 2
 
 Weekly on Tuesday and Thursday for five weeks:
 
-> takeUntil (<= oct1997) $ recur weekly `withStartOfWeek` Sunday `starting` sep1997 $
->   enumWeekDaysInWeek [Tuesday, Thursday]
+> takeUntil (<= oct1997) $ starting sep1997 $
+>   recur weekly `withStartOfWeek` Sunday
+>   >==> enum (WeekDaysInWeek [Tuesday, Thursday])
 
 or
 
-> take 10 $ recur weekly `withStartOfWeek` Sunday `starting` sep1997 $
->   enumWeekDaysInWeek [Tuesday, Thursday]
+> take 10 $ starting sep1997 $
+>   recur weekly `withStartOfWeek` Sunday
+>   >==> enum (WeekDaysInWeek [Tuesday, Thursday])
 
 Every other week (Monday, Wednesday, Firday) until Dec. 24, 1997:
 
-> takeWhile (<= dec1997) $ recur weekly `withStartOfWeek` Sunday `by` 2 `starting` sep1997$
->   enumWeekDaysInWeek [Monday, Wednesday, Friday] >=>
+> takeWhile (<= dec1997) $ starting sep1997 $
+>   recur weekly `withStartOfWeek` Sunday `by` 2
+>   >==> enum (WeekDaysInWeek [Monday, Wednesday, Friday])
 
 > Every other week on Tuesday and Thursday, for 8 occurrences:
 
-> take 8 $ recur weekly `withStartOfWeek` Sunday `by` 2 `starting` sep1997 $
->   enumWeekDaysInWeek [Tuesday, Thursday]
+> take 8 $ starting sep1997 $
+>   recur weekly `by` 2 `withStartOfWeek` Sunday
+>   >==> enum (WeekDaysInWeek [Tuesday, Thursday])
 
 Monthly on the first Friday for 10 occurrences:
 
-> take 10 $ recur monthly `starting` sep1997 $
->   enumWeekDaysInMonth [Friday] >=>
->   nthWeekDayOfMonth [1]
+> take 10 $ starting sep1997 $
+>   recur monthly
+>   >==> enum (WeekDaysInMonth [Friday])
+>   >==> select (WeekDaysInMonth [1])
 
 Monthly on the first Friday until Dec. 24, 1997
 
-> takeWhile (<= dec1997) $ recur monthly `starting` sep1997 $
->   enumWeekDaysInMonth [Friday] >=>
->   nthWeekDayOfMonth [1]
+> takeWhile (<= dec1997) $ starting sep1997 $
+>   recur monthly
+>   >==> enum (WeekDaysInMonth [Friday])
+>   >==> select (WeekDaysInMonth [1])
 
 Every other month on the first and last Sunday of the month for 10 occurrences:
 
-> take 10 $ recur monthly `by` 2 `starting` sep1997 $
->   enumWeekDaysInMonth [Sunday] >=>
->   nthWeekDayOfMonth [1,-1]
+> take 10 $ starting sep1997 $
+>   recur monthly
+>   >==> enum (WeekDaysInMonth [Sunday])
+>   >==> select (WeekDaysInMonth [1,-1])
 
 Monthly on the second-to-last Monday of the month for 6 months:
 
-> take 6 $ recur monthly `starting` sep1997 $
->   enumWeekDaysInMonth [Monday] >=>
->   nthWeekDayOfMonth [-2]
+> take 6 $ starting sep1997 $
+>   recur monthly
+>   >==> enum (WeekDaysInMonth [Monday])
+>   >==> select (WeekDaysInMonth [-2])
 
 Monthly on the third-to-last day of the month, forever:
 
-> recur monthly `starting` sep1997 $ enumDays [-3]
+> starting sep1997 $
+>   recur monthly
+>   >==> enum (Days [-3])
 
 Monthly on the 2nd and 15th of the month for 10 occurrences:
 
-> take 10 $ recur monthly `starting` sep1997 $ enumDays [2,15]
+> take 10 $ starting sep1997 $
+>   recur monthly
+>   >==> enum (Days [2,15])
 
 Monthly on the first and last day of the month for 10 occurrences:
 
-> take 10 $ recur monthly `starting` sep1997 $ enumDays [1,-1]
+> take 10 $ starting sep1997 $
+>   recur monthly
+>   >==> enum (Days [1,-1])
 
 Every 18 months on the 10th thru 15th of the month for 10 occurrences:
 
-> take 10 $ recur monthly `by` 18 `starting` sep1997 $ enumDays [10 .. 15]
+> take 10 $ starting sep1997 $
+>   recur monthly
+>   >==> enum (Days [10 .. 15])
 
 Every Tuesday, every other month:
 
-> recur monthly `by` 2 `starting` sep1997 $ enumWeekDaysInMonth [Tuesday]
+> starting sep1997 $
+>   recur monthly `by` 2
+>   >==> enum (WeekDaysInMonth [Tuesday])
 
 Yearly in June and July for 10 occurrences:
 
-> take 10 $ recur yearly `starting` sep1997 $ enumMonths [June, July]
+> take 10 $ starting sep1997 $
+>   recur yearly
+>   >==> enum (Months [June, July])
 
 Every other year on January thru March for 10 occurrences:
 
-> take 10 $ recur yearly `by` 2 `starting` mar1997 $ 
->   enumMonths [January .. March] >=>
->   enumWeekDaysInMonth [Monday .. Sunday]
+> take 10 $ starting mar1997 $
+>   recur yearly `by` 2
+>   >==> enum (Months [January .. March])
+>   >==> enum (WeekDaysInMonth [Monday .. Sunday])
 
 Every third year on the 1st, 100th, and 200th day for 10 occurrences:
 
-> take 10 $ recur yearly `by` 3 `starting` sep1997 $
->   enumYearDays [1,100,200]
+> take 10 $ starting sep1997 $
+>   recur yearly `by` 3
+>   >==> enum (YearDays [1,100,200])
 
 Every 20th Monday of the year, forever:
 
-> recur monthly `starting` sep1997 $ 
->   enumWeekDaysInMonth [Monday] >=>
->   nthWeekDay [20]
+> starting sep1997 $
+>   recur montly
+>   >==> enum (WeekDaysInMonth [Monday])
+>   >==> select (WeekDays [20])
 
 Monday of week number 20, forever:
 
-> recur yearly `starting` mar1997 $
->   enumWeekNumbers [20] >=>
->   filterWeekDays [Monday]
+> starting mar1997 $
+>   recur yearly
+>   >==> enum (Weeks [20])
+>   >==> filter (WeekDays [Monday])
 
 or
 
-> recur weekly `starting` mar1997 $
->  filterWeekNumbers [20] >=>
->  filterWeekDays [Monday]
+> starting mar1997 $
+>   recur weekly
+>   >==> filter (Weeks [20])
+>   >==> filter (WeekDays [Monday])
 
 Every Thursday in March, forever:
 
-> recur yearly `starting` mar1997 $
->   enumMonths [March] >=>
->   enumWeekDaysInMonth [Thrusday]
+> starting mar1997 $
+>   recur yearly
+>   >==> enum (Months [March])
+>   >==> enum (WeekDaysInMonth [Thursday])
 
 Every Thursday, but only during June thru August, forever:
 
-> recur yearly `starting` mar1997 $
->   enumMonths [June .. August] >=>
->   enumWeekDaysInMonth [Thursday]
+> starting mar1997 $
+>   recur yearly
+>   >==> enum (Months [June .. August])
+>   >==> enum (WeekDaysInMonth [Thursday])
 
-Firday the 13th, Forever:
+Friday the 13th, Forever:
 
-> recur monthly `starting` sep1997 $ enumDays [13] >=> filterWeekDays [Friday]
+> starting sep1997
+>   recur monthly
+>   >==> enum (Days [13])
+>   >==> filter (WeekDays [Friday])
 
 The first Saturday that follows the first Sunday of the month, forever:
 
@@ -176,65 +210,81 @@ The first Saturday that follows the first Sunday of the month, forever:
 U.S. Presidential Election Day:
 Every 4 years, the first Tuesday after a Monday in November, forever:
 
-> recur yearly `by` 4 `starting` nov1996 $
->   enumMonths [November] >=>
->   enumDays [2 .. 8] >=>
->   filterWeekDays [Tuesday]
+> starting nov1996 $
+>   recur yearly `by` 4
+>   >==> enum (Months [November])
+>   >==> enum (Days [2 .. 8])
+>   >==> filter (WeekDays [Tuesday])
 
 The third instance into the month of one of Tuesday, Wednesday, or Thursday, for the next 3 months.
 
-> take 3 $ recur monthly `starting` sep1997 $
->   enumWeekDaysInMonth [Tuesday .. Thursday] >=>
->   nthWeekDayOfMonth [3]
+> take 3 $ starting sep1997 $
+>   recur monthly
+>   >==> enum (WeekDaysInMonth [Tuesday .. Thursday])
+>   >==> select (WeekDaysInMonth [3])
 
 The second-to-last weekday of the month:
 
-> recur monthly `starting` sep1997 $
->   enumWeekDaysOfMonth [Monday .. Friday] >=>
->   nthWeekDayOfMonth [-2]
+> starting sep1997 $
+>   recur monthly
+>   >==> enum (WeekDaysInMonth [Monday .. Friday])
+>   >==> select (WeekDaysInMonth [-2])
 
 Every 3 hours from 9:00 AM to 5:00 PM on a specific day:
 
 > takeWhile (<= addSeconds sep1997 (8 * oneHour)) $ 
->   recur hourly `by` 3 `begin` sep1997
+>   starting sep1997 $
+>   recur hourly `by` 3
 
 Every 15 minutes for 6 occurrences:
 
-> take 6 $ recur minutely `by` 15 `begin` sep1997
+> take 6 $ starting sep1997 $
+>   recur minutely `by` 15
 
-Every hour and a hald for 4 occurrences:
+Every hour and a half for 4 occurrences:
 
-> take 4 $ recur minutely `by` 90 `begin` sep1997
+> take 4 $ starting sep1997 $ recur minutely `by` 90
 
 Every 20 minutes from 9:00 AM to 4:40 PM every day:
 
-> recur daily `starting` sep1997 $
->   enumHours [9 .. 16] >=>
->   enumMinutes [0,20,40]
+> staring sep1997 $
+>   recur daily $
+>   >==> enum (Hours [9 .. 16])
+>   >==> enum (Minutes [0,20,40])
 
 or
 
-> recur minutely `by` 20 `starting` sep1997 $ enumHours [9 .. 16]
+> starting sep1997 $
+>   recur minutely `by` 20
+>   >==> enum (Hours [9 .. 16])
 
 The following two examples will generate different results due to changes in the start of the week.
 
-> take 4 $ recur weekly `by` 2 `withStartOfWeek` Monday $
->   enumWeekDaysInWeek [Tuesday,Sunday]
+> take 4 $
+>   recur weekly `by` 2 `withStartOfWeek` Monday
+>   >==> enum (WeekDaysInWeek [Tuesday, Sunday])
 
 vs
 
-> take 4 $ recur weekly `by` 2 `withStartOfWeek` Sunday $
->   enumWeekDaysInWeek [Tuesday,Sunday]
+> take 4 $
+>   recur weekly `by` 2 `withStartOfWeek` Sunday
+>   >==> enum (WeekDaysInWeek [Tuesday, Sunday])
 
 An example where an invalid date (Feb. 30) is ignored:
 
-> take 5 $ recur monthly `starting` jan2000 $ enumDays [15,30]
+> take 5 $ starting jan2000 $
+>   recur monthly
+>   >==> enum (Days [15,30])
 
 The 15th and the 30th of the month, forever:
 
-> recur monthly `starting` sep1997 $ enumDays [15,30]
+> starting sep1997 $
+>   recur monthly
+>   >==> enum (Days [15,30])
 
 The 15th and the 30th of the month, but only during the work week:
-> recur monthly `starting` sep1997 $
->   enumDays [15,30] >=>
->   filterWeekDays [Monday .. Friday]
+
+> starting sep1997 $
+>   recur monthly
+>   >==> enum (Days [15,30])
+>   >==> filter (WeekDays [Monday .. Friday])
