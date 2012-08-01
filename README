@@ -36,7 +36,7 @@ Every 10 days, 5 occurrences:
 
 Every day in January, for 3 years:
 
-> takeWhile (<= jan2000) $ starting jan1998 $ Recur yearly `Then` $
+> takeWhile (<= jan2000) $ starting jan1998 $ Recur yearly :$
 >   Enumerate . TheMonths $ [January] :>
 >   Filter . OnWeekDays $ [Monday .. Sunday]
 

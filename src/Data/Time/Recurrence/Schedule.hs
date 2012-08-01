@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, StandaloneDeriving #-}
+{-# LANGUAGE GADTs, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, StandaloneDeriving, UndecidableInstances #-}
 -- This module is intended to be imported @qualified!, to avoid name
 -- clashes with "Prelude" functions. eg.
 --
@@ -9,7 +9,10 @@ module Data.Time.Recurrence.Schedule
       Schedule (..)
 
       -- * Freq
-    , Freq (..)
+    , Freq
+
+      -- * Function interface to Recur
+    , recur
 
       -- * Adjust Interval
     , by
@@ -32,13 +35,15 @@ module Data.Time.Recurrence.Schedule
     )
   where
 
-import Control.Monad ((>=>))
 import Data.List.Ordered as O
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
 import Data.Time.CalendarTime
-import Data.Time.Moment hiding (interval, startOfWeek)
-import Data.Time.Recurrence.ScheduleDetails
+import Data.Time.Moment hiding (interval, startOfWeek, Period(..))
+import qualified Data.Time.Moment as M (Period(..))
+import Data.Time.Recurrence.AndThen
+import Data.Time.Recurrence.ScheduleDetails hiding (eval)
+import qualified Data.Time.Recurrence.ScheduleDetails as D (eval)
 
 data Freq
     = Secondly { interval :: Interval, startOfWeek :: StartOfWeek }
@@ -89,46 +94,18 @@ withStartOfWeek fr sow = fr{startOfWeek=toStartOfWeek sow}
 
 data Schedule a where
     Recur :: Freq -> Schedule Freq
-    Then  :: Schedule Freq -> ScheduleDetails b -> Schedule (ScheduleDetails b)
+    And  :: Schedule Freq -> ScheduleDetails b -> Schedule (ScheduleDetails b)
 
 deriving instance Show (Schedule a)
 
-eval' :: (CalendarTimeConvertible a, Ord a, Moment a) => ScheduleDetails b -> ([a] -> FutureMoments a)
-eval' (Enumerate x) = case x of
-    (EPSeconds ss)         -> enumSeconds ss
-    (EPMinutes mm)         -> enumMinutes mm
-    (EPHours hh)           -> enumHours hh
-    (EPWeekDaysInWeek ww)  -> enumWeekDaysInWeek ww
-    (EPWeekDaysInMonth ww) -> enumWeekDaysInMonth ww
-    (EPDays dd)            -> enumDays dd
-    (EPMonths mm)          -> enumMonths mm
-    (EPYearDays yy)        -> enumYearDays yy
-eval' (Filter x) = case x of
-    (FPSeconds ss)  -> filterSeconds ss
-    (FPMinutes mm)  -> filterMinutes mm
-    (FPHours hh)    -> filterHours hh
-    (FPWeekDays ww) -> filterWeekDays ww
-    (FPDays dd)     -> filterDays dd
-    (FPMonths mm)   -> filterMonths mm
-    (FPYearDays yy) -> filterYearDays yy
-eval' (Select x) = case x of
-    (SPSeconds ss)         -> nthSecond ss
-    (SPMinutes mm)         -> nthMinute mm
-    (SPHours hh)           -> nthHour hh
-    (SPWeekDaysInWeek ww)  -> nthWeekDayOfWeek ww
-    (SPWeekDaysInMonth ww) -> nthWeekDayOfMonth ww
-    (SPDays dd)            -> nthDay dd
-    (SPMonths mm)          -> nthDay mm
-    (SPYearDays yy)        -> nthYearDay yy
-eval' ((:&) x y)   = eval' x >=> eval' y
-eval' ((:|) x y)   = eval' x >=> eval' y
-eval' ((:!!) x y)  = eval' x >=> eval' y
-eval' ((:>) x y)   = eval' x >=> eval' y
-eval' ((:>>) x y)  = eval' x >=> eval' y
-eval' ((:>>>) x y) = eval' x >=> eval' y
+recur :: Freq -> Schedule Freq
+recur = Recur
+
+instance AndThen (Schedule Freq) (ScheduleDetails b) (Schedule (ScheduleDetails b)) where
+  (===>) x y = And x y
 
 eval :: (CalendarTimeConvertible a, Ord a, Moment a) => Schedule b -> (a -> [a])
-eval (Then recur details) = flip (startWith $ mkIM recur) $ eval' details
+eval (And recur details) = flip (startWith $ mkIM recur) $ D.eval details
 eval recur@(Recur _)      = start $ mkIM recur
 
 starting :: (CalendarTimeConvertible a, Ord a, Moment a) => a -> Schedule b -> [a]
@@ -136,15 +113,15 @@ starting m0 sch = (eval sch) m0
 
 mkIM :: Moment a => Schedule Freq -> InitialMoment a
 mkIM (Recur freq) =
-    mkIM' (case freq of (Secondly _ _) -> Seconds
-                        (Minutely _ _) -> Minutes
-                        (Hourly   _ _) -> Hours
-                        (Daily    _ _) -> Days
-                        (Weekly   _ _) -> Weeks
-                        (Monthly  _ _) -> Months
-                        (Yearly   _ _) -> Years) (interval freq) (startOfWeek freq)
+    mkIM' (case freq of (Secondly _ _) -> M.Seconds
+                        (Minutely _ _) -> M.Minutes
+                        (Hourly   _ _) -> M.Hours
+                        (Daily    _ _) -> M.Days
+                        (Weekly   _ _) -> M.Weeks
+                        (Monthly  _ _) -> M.Months
+                        (Yearly   _ _) -> M.Years) (interval freq) (startOfWeek freq)
   where
-    mkIM' :: Moment a => Period -> Interval -> StartOfWeek -> InitialMoment a
+    mkIM' :: Moment a => M.Period -> Interval -> StartOfWeek -> InitialMoment a
     mkIM' per int sow = InitialMoment per int sow epoch
 
 -- | 'startWith' is an infinite list of 'Moment's, where no 'Moment' 

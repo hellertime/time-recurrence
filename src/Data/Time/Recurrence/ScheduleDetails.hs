@@ -1,216 +1,166 @@
-{-# LANGUAGE GADTs, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, StandaloneDeriving #-}
+{-# LANGUAGE GADTs, EmptyDataDecls, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, RankNTypes, StandaloneDeriving, UndecidableInstances #-}
 module Data.Time.Recurrence.ScheduleDetails
     (
       -- * ScheduleDetails
       ScheduleDetails (..)
 
-      -- * NominalSet typeclass
-    , NominalSet
+    , eval
 
-      -- * newtype wrappers from non-distinct period types
-    , Second
-    , Minute
-    , Hour
-    , Day
-    , YearDay
-    , WeekDayInWeek
-    , WeekDayInMonth
+      -- * Functional interface to constructors
+    , enum
+    , filter
+    , select
 
-      -- * EnumerablePeriod
-    , EnumerablePeriod
-
-      -- * EPeriod
-    , EPeriod (..)
-
-      -- * FilterablePeriod
-    , FilterablePeriod
-
-      -- * FPeriod
-    , FPeriod (..)
-
-      -- * SelectablePeriod
-    , SelectablePeriod
-
-      -- * SPeriod
-    , SPeriod (..)
+      -- * Period Filters
+    , PeriodFilter (..)
+    , EnumerablePeriodFilter (..)
+    , FilterablePeriodFilter (..)
+    , SelectablePeriodFilter (..)
     )
   where
 
+import Prelude hiding (filter)
+import Control.Monad ((>=>))
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
+import Data.Time.CalendarTime
+import Data.Time.Moment hiding (Period(..))
+import Data.Time.Recurrence.AndThen
 
-infixr 5 :&, :| --, :!!
-infixr 0 :> --, :>>, :>>>
+infixr 5 :&, :|, :!!
+infixr 0 :>, :>>, :>>>
 
 data ScheduleDetails a where
-    Enumerate :: (EnumerablePeriod a b) => a -> ScheduleDetails (EPeriod b)
-    Filter    :: (FilterablePeriod a b) => a -> ScheduleDetails (FPeriod b)
---    Select    :: (SelectablePeriod a)   => a -> ScheduleDetails SPeriod
-    (:&)      :: ScheduleDetails (EPeriod a) -> ScheduleDetails (EPeriod a) -> ScheduleDetails (EPeriod a)
-    (:|)      :: ScheduleDetails (FPeriod a) -> ScheduleDetails (FPeriod a) -> ScheduleDetails (FPeriod a)
---    (:!!)     :: ScheduleDetails SPeriod     -> ScheduleDetails SPeriod     -> ScheduleDetails SPeriod
-    (:>)      :: ScheduleDetails (EPeriod a) -> ScheduleDetails (FPeriod b) -> ScheduleDetails (FPeriod b)
---    (:>>)     :: ScheduleDetails (FPeriod a) -> ScheduleDetails SPeriod     -> ScheduleDetails SPeriod
---    (:>>>)    :: ScheduleDetails (EPeriod a) -> ScheduleDetails SPeriod     -> ScheduleDetails SPeriod
+    Enumerate :: EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter
+    Filter    :: FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
+    Select    :: SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
+    (:&)      :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter
+    (:|)      :: ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
+    (:!!)     :: ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
+    (:>)      :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
+    (:>>)     :: ScheduleDetails FilterablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
+    (:>>>)    :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
 
 deriving instance Show (ScheduleDetails a)
 
-newtype Second         = Second         { fromSecond  :: Int }            deriving (Eq, Ord, Read, Show)
-newtype Minute         = Minute         { fromMinute  :: Int }            deriving (Eq, Ord, Read, Show)
-newtype Hour           = Hour           { fromHour    :: Int }            deriving (Eq, Ord, Read, Show)
-newtype Day            = Day            { fromDay     :: Int }            deriving (Eq, Ord, Read, Show)
-newtype YearDay        = YearDay        { fromYearDay :: Int }            deriving (Eq, Ord, Read, Show)
-newtype WeekDayInWeek  = WeekDayInWeek  { fromWeekDayInWeek :: WeekDay }  deriving (Eq, Ord, Read, Show)
-newtype WeekDayInMonth = WeekDayInMonth { fromWeekDayInMonth :: WeekDay } deriving (Eq, Ord, Read, Show)
+enum :: PeriodFilter Month WeekDay NotEnumerable -> ScheduleDetails EnumerablePeriodFilter
+enum = Enumerate . EPF
 
-class NominalSet a b | b -> a where
-  toNominalSet :: [a] -> [b]
-  fromNominalSet :: [b] -> [a]
+filter :: PeriodFilter Month NotFilterable WeekDay -> ScheduleDetails FilterablePeriodFilter
+filter = Filter . FPF
 
-instance NominalSet Int Second where
-  toNominalSet = map (Second)
-  fromNominalSet = map (fromSecond)
+select :: PeriodFilter Int Int Int -> ScheduleDetails SelectablePeriodFilter
+select = Select . SPF
 
-instance NominalSet Int Minute where
-  toNominalSet = map (Minute)
-  fromNominalSet = map (fromMinute)
+type BareEPF = EnumerablePeriodFilter
+type WrapEPF = ScheduleDetails EnumerablePeriodFilter
 
-instance NominalSet Int Hour where
-  toNominalSet = map (Hour)
-  fromNominalSet = map (fromHour)
+instance AndThen BareEPF BareEPF WrapEPF where
+  (===>) x y = (Enumerate x) :& (Enumerate y)
 
-instance NominalSet Int Day where
-  toNominalSet = map (Day)
-  fromNominalSet = map (fromDay)
+instance AndThen BareEPF WrapEPF WrapEPF where
+  (===>) x y = (Enumerate x) :& y
 
-instance NominalSet Int YearDay where
-  toNominalSet = map (YearDay)
-  fromNominalSet = map (fromYearDay)
+instance AndThen WrapEPF WrapEPF WrapEPF where
+  (===>) x y = x :& y
 
-instance NominalSet WeekDay WeekDayInWeek where
-  toNominalSet = map (WeekDayInWeek)
-  fromNominalSet = map (fromWeekDayInWeek)
+type BareFPF = FilterablePeriodFilter
+type WrapFPF = ScheduleDetails FilterablePeriodFilter
 
-instance NominalSet WeekDay WeekDayInMonth where
-  toNominalSet = map (WeekDayInMonth)
-  fromNominalSet = map (fromWeekDayInMonth)
+instance AndThen BareFPF BareFPF WrapFPF where
+  (===>) x y = (Filter x) :| (Filter y)
 
-instance NominalSet WeekDay WeekDay where
-  toNominalSet = id
-  fromNominalSet = id
+instance AndThen BareFPF WrapFPF WrapFPF where
+  (===>) x y = (Filter x) :| y
 
-instance NominalSet Month Month where
-  toNominalSet = id
-  fromNominalSet = id
+instance AndThen WrapFPF WrapFPF WrapFPF where
+  (===>) x y = x :| y
 
-data EPeriod a
-    = EPSeconds [a]
-    | EPMinutes [a]
-    | EPHours [a]
-    | EPWeekDaysInWeek [a]
-    | EPWeekDaysInMonth [a]
-    | EPDays [a]
-    | EPMonths [a]
-    | EPYearDays [a]
+type BareSPF = SelectablePeriodFilter
+type WrapSPF = ScheduleDetails SelectablePeriodFilter
+
+instance AndThen BareSPF BareSPF WrapSPF where
+  (===>) x y = (Select x) :!! (Select y)
+
+instance AndThen BareSPF WrapSPF WrapSPF where
+  (===>) x y = (Select x) :!! y
+
+instance AndThen WrapSPF WrapSPF WrapSPF where
+  (===>) x y = x :!! y
+
+instance AndThen WrapEPF WrapFPF WrapFPF where
+  (===>) x y = x :> y
+
+instance AndThen WrapFPF WrapSPF WrapSPF where
+  (===>) x y = x :>> y
+
+instance AndThen WrapEPF WrapSPF WrapSPF where
+  (===>) x y = x :>>> y
+
+data PeriodFilter m e f
+    = Seconds [Int]
+    | Minutes [Int]
+    | Hours [Int]
+    | Days [Int]
+    | Weeks [Int]
+    | WeekDays [f]
+    | WeekDaysInWeek [e]
+    | WeekDaysInMonth [e]
+    | Months [m]
+    | YearDays [Int]
   deriving (Read, Show)
 
-class (NominalSet a b) => EnumerablePeriod a b where
-  on :: [a] -> ScheduleDetails (EPeriod b)
+data NotEnumerable
+data NotFilterable
 
-instance EnumerablePeriod Int Second where
-  on = Enumerate . EPSeconds . toNominalSet
+instance Show NotEnumerable where
+  show _ = undefined
 
-instance EnumerablePeriod Int Minute where
-  on = Enumerate . EPMinutes . toNominalSet
+instance Read NotEnumerable where
+  readsPrec _ _ = undefined
 
-instance EnumerablePeriod Int Hour where
-  on = Enumerate . EPHours . toNominalSet
+instance Show NotFilterable where
+  show _ = undefined
 
-instance EnumerablePeriod WeekDay WeekDayInWeek where
-  on = Enumerate . EPWeekDaysInWeek . toNominalSet
+instance Read NotFilterable where
+  readsPrec _ _ = undefined
 
-instance EnumerablePeriod WeekDay WeekDayInMonth where
-  on = Enumerate . EPWeekDaysInMonth . toNominalSet
+newtype EnumerablePeriodFilter = EPF { fromEPF :: PeriodFilter Month WeekDay NotEnumerable } deriving (Read, Show)
+newtype FilterablePeriodFilter = FPF { fromFPF :: PeriodFilter Month NotFilterable WeekDay } deriving (Read, Show)
+newtype SelectablePeriodFilter = SPF { fromSPF :: PeriodFilter Int Int Int } deriving (Read, Show)
 
-instance EnumerablePeriod Int Day where
-  on = Enumerate . EPDays . toNominalSet
+eval :: (CalendarTimeConvertible a, Ord a, Moment a) => ScheduleDetails b -> ([a] -> FutureMoments a)
+eval (Enumerate x) = case (fromEPF x) of
+    (Seconds ss)         -> enumSeconds ss
+    (Minutes mm)         -> enumMinutes mm
+    (Hours hh)           -> enumHours hh
+    (WeekDaysInWeek ww)  -> enumWeekDaysInWeek ww
+    (WeekDaysInMonth ww) -> enumWeekDaysInMonth ww
+    (Days dd)            -> enumDays dd
+    (Months mm)          -> enumMonths mm
+    (YearDays yy)        -> enumYearDays yy
+eval (Filter x) = case (fromFPF x) of
+    (Seconds ss)  -> filterSeconds ss
+    (Minutes mm)  -> filterMinutes mm
+    (Hours hh)    -> filterHours hh
+    (WeekDays ww) -> filterWeekDays ww
+    (Days dd)     -> filterDays dd
+    (Months mm)   -> filterMonths mm
+    (YearDays yy) -> filterYearDays yy
+eval (Select x) = case (fromSPF x) of
+    (Seconds ss)         -> nthSecond ss
+    (Minutes mm)         -> nthMinute mm
+    (Hours hh)           -> nthHour hh
+    (WeekDaysInWeek ww)  -> nthWeekDayOfWeek ww
+    (WeekDaysInMonth ww) -> nthWeekDayOfMonth ww
+    (Days dd)            -> nthDay dd
+    (Months mm)          -> nthDay mm
+    (YearDays yy)        -> nthYearDay yy
+eval ((:&) x y)   = eval x >=> eval y
+eval ((:|) x y)   = eval x >=> eval y
+eval ((:!!) x y)  = eval x >=> eval y
+eval ((:>) x y)   = eval x >=> eval y
+eval ((:>>) x y)  = eval x >=> eval y
+eval ((:>>>) x y) = eval x >=> eval y
 
-instance EnumerablePeriod Month Month where
-  on = Enumerate . EPMonths . toNominalSet
 
-instance EnumerablePeriod Int YearDay where
-  on = Enumerate . EPYearDays . toNominalSet
-
-data FPeriod a
-    = FPSeconds [a]
-    | FPMinutes [a]
-    | FPHours [a]
-    | FPWeekDays [a]
-    | FPDays [a]
-    | FPMonths [a]
-    | FPYearDays [a]
-  deriving (Read, Show)
-
-class (NominalSet a b) => FilterablePeriod a b where
-  filter :: [a] -> ScheduleDetails (FPeriod b)
-
-instance FilterablePeriod Int Second where
-  filter = Filter . FPSeconds . toNominalSet
-
-instance FilterablePeriod Int Minute where
-  filter = Filter . FPMinutes . toNominalSet
-
-instance FilterablePeriod Int Hour where
-  filter = Filter . FPHours . toNominalSet
-
-instance FilterablePeriod WeekDay WeekDay where
-  filter = Filter . FPWeekDays . toNominalSet
-
-instance FilterablePeriod Int Day where
-  filter = Filter . FPDays . toNominalSet
-
-instance FilterablePeriod Month Month where
-  filter = Filter . FPMonths . toNominalSet
-
-instance FilterablePeriod Int YearDay where
-  filter = Filter . FPYearDays . toNominalSet
-
-{-
-data SPeriod
-    = SPSeconds [Int]
-    | SPMinutes [Int]
-    | SPHours [Int]
-    | SPWeekDaysInWeek [Int]
-    | SPWeekDaysInMonth [Int]
-    | SPDays [Int]
-    | SPMonths [Int]
-    | SPYearDays [Int]
-  deriving (Read, Show)
-
-class SelectablePeriod a where
-  select :: [Int] -> ScheduleDetails SPeriod
-
-instance SelectablePeriod Second where
-  select = Select . SPSeconds 
-
-instance SelectablePeriod Minute where
-  select = Select . SPMinutes
-
-instance SelectablePeriod Hour where
-  select = Select . SPHours
-
-instance SelectablePeriod WeekDayInWeek where
-  select = Select . SPWeekDaysInWeek
-
-instance SelectablePeriod WeekDayInMonth where
-  select = Select . SPWeekDaysInMonth
-
-instance SelectablePeriod Day where
-  select = Select . SPDays
-
-instance SelectablePeriod Month where
-  select = Select . SPMonths
-
-instance SelectablePeriod YearDay where
-  select = Select . SPYearDays
--}
