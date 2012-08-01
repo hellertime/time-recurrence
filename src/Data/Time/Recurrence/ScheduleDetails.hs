@@ -53,46 +53,46 @@ type BareEPF = EnumerablePeriodFilter
 type WrapEPF = ScheduleDetails EnumerablePeriodFilter
 
 instance AndThen BareEPF BareEPF WrapEPF where
-  (===>) x y = (Enumerate x) `EPFCons` (Enumerate y)
+  (>==>) x y = (Enumerate x) `EPFCons` (Enumerate y)
 
 instance AndThen BareEPF WrapEPF WrapEPF where
-  (===>) x y = (Enumerate x) `EPFCons` y
+  (>==>) x y = (Enumerate x) `EPFCons` y
 
 instance AndThen WrapEPF WrapEPF WrapEPF where
-  (===>) x y = x `EPFCons` y
+  (>==>) x y = x `EPFCons` y
 
 type BareFPF = FilterablePeriodFilter
 type WrapFPF = ScheduleDetails FilterablePeriodFilter
 
 instance AndThen BareFPF BareFPF WrapFPF where
-  (===>) x y = (Filter x) `FPFCons` (Filter y)
+  (>==>) x y = (Filter x) `FPFCons` (Filter y)
 
 instance AndThen BareFPF WrapFPF WrapFPF where
-  (===>) x y = (Filter x) `FPFCons` y
+  (>==>) x y = (Filter x) `FPFCons` y
 
 instance AndThen WrapFPF WrapFPF WrapFPF where
-  (===>) x y = x `FPFCons` y
+  (>==>) x y = x `FPFCons` y
 
 type BareSPF = SelectablePeriodFilter
 type WrapSPF = ScheduleDetails SelectablePeriodFilter
 
 instance AndThen BareSPF BareSPF WrapSPF where
-  (===>) x y = (Select x) `SPFCons` (Select y)
+  (>==>) x y = (Select x) `SPFCons` (Select y)
 
 instance AndThen BareSPF WrapSPF WrapSPF where
-  (===>) x y = (Select x) `SPFCons` y
+  (>==>) x y = (Select x) `SPFCons` y
 
 instance AndThen WrapSPF WrapSPF WrapSPF where
-  (===>) x y = x `SPFCons` y
+  (>==>) x y = x `SPFCons` y
 
 instance AndThen WrapEPF WrapFPF WrapFPF where
-  (===>) x y = x `EPFConsFPF` y
+  (>==>) x y = x `EPFConsFPF` y
 
 instance AndThen WrapFPF WrapSPF WrapSPF where
-  (===>) x y = x `FPFConsSPF` y
+  (>==>) x y = x `FPFConsSPF` y
 
 instance AndThen WrapEPF WrapSPF WrapSPF where
-  (===>) x y = x `EPFConsSPF` y
+  (>==>) x y = x `EPFConsSPF` y
 
 data PeriodFilter m e f
     = Seconds [Int]

@@ -5,7 +5,7 @@ module Data.Time.Recurrence.AndThen
     )
   where
 
-infixr 0 ===>
+infixr 0 >==>
 
 class AndThen a b c | a b -> c where
-  (===>) :: a -> b -> c
+  (>==>) :: a -> b -> c
