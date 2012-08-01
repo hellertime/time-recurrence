@@ -25,6 +25,7 @@ module Data.Time.Recurrence.Schedule
     , hourly
     , daily
     , weekly
+    , monthly
     , yearly
 
       -- * evaluate a Schedule into a function
