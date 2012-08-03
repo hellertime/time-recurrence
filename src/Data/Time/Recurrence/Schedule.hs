@@ -1,316 +1,139 @@
+{-# LANGUAGE GADTs, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, StandaloneDeriving, UndecidableInstances #-}
 -- This module is intended to be imported @qualified!, to avoid name
 -- clashes with "Prelude" functions. eg.
 --
 -- > import qualified Data.Time.Recurrence.Schedule as S
 module Data.Time.Recurrence.Schedule
     (
-      Schedule -- abstract, instances: Eq, Ord, Show
+      -- * Schedule
+      Schedule (..)
+
+      -- * Freq
+    , Freq
+
+      -- * Function interface to Recur
     , recur
+
+      -- * Adjust Interval
+    , by
+      -- * Adjust Start of Week
+    , withStartOfWeek
+
+      -- * Default Freq
+    , secondly
+    , minutely
+    , hourly
+    , daily
+    , weekly
+    , monthly
+    , yearly
+
+      -- * evaluate a Schedule into a function
+    , eval
+
+      -- * run an evaluated Schedule from a moment
     , starting
-    , begin
-
-    , enumMonths
-    , enumDays
-    , enumWeekDaysInWeek
-    , enumWeekDaysInMonth
-    , enumYearDays
-    , enumHours
-    , enumMinutes
-    , enumSeconds
-
-    , nthMonth
-    , nthDay
-    , nthWeekDay
-    , nthWeekDayOfWeek
-    , nthWeekDayOfMonth
-    , nthYearDay
-    , nthHour
-    , nthMinute
-    , nthSecond
-
-    , filterMonths
-    , filterDays
-    , filterWeekDays
-    , filterYearDays
-    , filterHours
-    , filterMinutes
-    , filterSeconds
     )
   where
 
-import Control.Monad.Reader
-import Data.List as L
 import Data.List.Ordered as O
-import Data.Maybe (mapMaybe)
-import Data.Time.Calendar.Month
+import Data.Time.Calendar.Month ()
 import Data.Time.Calendar.WeekDay
-import Data.Time.CalendarTime hiding (withDay)
-import Data.Time.Moment
+import Data.Time.CalendarTime
+import Data.Time.Moment hiding (interval, startOfWeek, Period(..))
+import qualified Data.Time.Moment as M (Period(..))
+import Data.Time.Recurrence.AndThen
+import Data.Time.Recurrence.ScheduleDetails hiding (eval)
+import qualified Data.Time.Recurrence.ScheduleDetails as D (eval)
 
-type Schedule a = Reader (InitialMoment a) [a]
+data Freq
+    = Secondly { interval :: Interval, startOfWeek :: StartOfWeek }
+    | Minutely { interval :: Interval, startOfWeek :: StartOfWeek }
+    | Hourly   { interval :: Interval, startOfWeek :: StartOfWeek }
+    | Daily    { interval :: Interval, startOfWeek :: StartOfWeek }
+    | Weekly   { interval :: Interval, startOfWeek :: StartOfWeek }
+    | Monthly  { interval :: Interval, startOfWeek :: StartOfWeek }
+    | Yearly   { interval :: Interval, startOfWeek :: StartOfWeek }
+  deriving (Show)
 
-runSchedule :: Schedule a -> InitialMoment a -> [a]
-runSchedule = runReader
+defaultFreq :: (Interval -> StartOfWeek -> Freq) -> Freq
+defaultFreq = flip uncurry (toInterval 1, toStartOfWeek Sunday)
 
-repeatSchedule :: 
-  Moment a  => 
-  InitialMoment a 
-  -> ([a] -> Schedule a) 
-  -> [a]
-repeatSchedule im sch = runSchedule (iterateInitialMoment >>= sch) im
+secondly :: Freq
+secondly = defaultFreq Secondly
+
+minutely :: Freq
+minutely = defaultFreq Minutely
+
+hourly :: Freq
+hourly = defaultFreq Hourly
+
+daily :: Freq
+daily = defaultFreq Daily
+
+weekly :: Freq
+weekly = defaultFreq Weekly
+
+monthly :: Freq
+monthly = defaultFreq Monthly
+
+yearly :: Freq
+yearly = defaultFreq Yearly
+
+-- | Typically called infix on an existing 'Freq', like:
+-- 
+-- > monthly `by` 2
+by :: Freq -> Integer -> Freq
+by fr i = fr{interval=toInterval i}
+
+-- | Typically called infix on an existing 'Freq', like:
+--
+-- > weekly `withStartOfWeek` Tuesday
+withStartOfWeek :: Freq -> WeekDay -> Freq
+withStartOfWeek fr sow = fr{startOfWeek=toStartOfWeek sow}
+
+
+data Schedule a where
+    Recur :: Freq -> Schedule Freq
+    And  :: Schedule Freq -> ScheduleDetails b -> Schedule (ScheduleDetails b)
+
+deriving instance Show (Schedule a)
+
+recur :: Freq -> Schedule Freq
+recur = Recur
+
+instance AndThen (Schedule Freq) (ScheduleDetails b) (Schedule (ScheduleDetails b)) where
+  (>==>) x y = And x y
+
+eval :: (CalendarTimeConvertible a, Ord a, Moment a) => Schedule b -> (a -> [a])
+eval (And recur details) = flip (startWith $ mkIM recur) $ D.eval details
+eval recur@(Recur _)      = start $ mkIM recur
+
+starting :: (CalendarTimeConvertible a, Ord a, Moment a) => a -> Schedule b -> [a]
+starting m0 sch = (eval sch) m0
+
+mkIM :: Moment a => Schedule Freq -> InitialMoment a
+mkIM (Recur freq) =
+    mkIM' (case freq of (Secondly _ _) -> M.Seconds
+                        (Minutely _ _) -> M.Minutes
+                        (Hourly   _ _) -> M.Hours
+                        (Daily    _ _) -> M.Days
+                        (Weekly   _ _) -> M.Weeks
+                        (Monthly  _ _) -> M.Months
+                        (Yearly   _ _) -> M.Years) (interval freq) (startOfWeek freq)
   where
-    iterateInitialMoment :: Moment a => Schedule a
-    iterateInitialMoment = do
-      im <- ask
-      return $ iterate (next (interval im) (period im)) (moment im)
+    mkIM' :: Moment a => M.Period -> Interval -> StartOfWeek -> InitialMoment a
+    mkIM' per int sow = InitialMoment per int sow epoch
 
-recur :: a -> a
-recur = id
-
--- | 'starting' is an infinite list of 'Moment's, where no 'Moment' 
+-- | 'startWith' is an infinite list of 'Moment's, where no 'Moment' 
 -- occurrs before the 'InitialMoment'. The list is further refined
 -- by the passed in function.
-starting :: (Ord a, Moment a) => 
+startWith :: (Ord a, Moment a) => 
   InitialMoment a 
   -> a 
-  -> ([a] -> Schedule a) 
+  -> ([a] -> FutureMoments a)
   -> [a]
-starting im m0 = dropWhile (< m0) . O.nub . repeatSchedule im{moment=m0}
+startWith im m0 = dropWhile (< m0) . O.nub . iterateFutureMoments im{moment=m0}
 
-begin :: (Ord a, Moment a) => InitialMoment a -> a -> [a]
-begin im m0 = starting im m0 return
-
--- | Normalize an bounded ordinal index
---   Pass an upper-bound 'ub' and an index 'idx'
---   Converts 'idx' < 0 into valid 'idx' > 0 or
---   Nothing
-normalizeOrdinalIndex :: Int -> Int -> Maybe Int
-normalizeOrdinalIndex _ 0 = Nothing
-normalizeOrdinalIndex ub idx =
-  if abs idx > ub
-    then Nothing
-    else Just $ (idx + ub') `mod` ub'
-  where
-    ub' = ub + 1
-
-enumYearDays ::
-  (CalendarTimeConvertible a, Moment a) =>
-  [Int]
-  -> [a]
-  -> Schedule a
-enumYearDays days as = return $ concatMap (enumYearDays' days) as
-  where
-    enumYearDays' days a = mapMaybe (withYearDay a) (days' a days)
-    days' a = mapMaybe $ normalizeOrdinalIndex (daysInYear a)
-
-enumMonths :: 
-  (CalendarTimeConvertible a, Moment a) => 
-  [Month] 
-  -> [a] 
-  -> Schedule a
-enumMonths months as = return $ concatMap (enumMonths' months) as
-  where 
-    enumMonths' months a = mapMaybe (withMonth a) months
-
-enumDays ::
-  (CalendarTimeConvertible a, Moment a) =>
-  [Int]
-  -> [a]
-  -> Schedule a
-enumDays days as = return $ concatMap (enumDays' days) as
-  where 
-    enumDays' days a = mapMaybe (withDay a) (days' a days)
-    days' a = mapMaybe $ normalizeOrdinalIndex (lastDayOfMonth a)
-
-enumWeekDaysInWeek ::
-  (CalendarTimeConvertible a, Moment a) =>
-  [WeekDay]
-  -> [a]
-  -> Schedule a
-enumWeekDaysInWeek wdays as = return $ concatMap (enumWeekDays' wdays) as
-  where
-    enumWeekDays' :: (CalendarTimeConvertible a, Moment a) => [WeekDay] -> a -> [a]
-    enumWeekDays' wdays a0 = let
-      w0     = calendarWeekDay $ toCalendarTime a0
-      wdays' = dropWhile (/= w0) $ O.nubSort wdays
-      in map (advanceToWeekDay a0) wdays'
-
-enumWeekDaysInMonth ::
-  (CalendarTimeConvertible a, Moment a) =>
-  [WeekDay]
-  -> [a]
-  -> Schedule a
-enumWeekDaysInMonth wdays as = return $ concatMap (enumWeekDays' wdays) as
-  where
-    enumWeekDays' wdays a = let
-      mdays  = mapMaybe (withDay a) [1 .. lastDayOfMonth a]
-      in filter (flip elem wdays . calendarWeekDay . toCalendarTime) mdays
-      
-enumHours ::
-  (CalendarTimeConvertible a, Moment a) =>
-  [Int]
-  -> [a]
-  -> Schedule a
-enumHours hours as = return $ concatMap (enumHours' hours) as
-  where
-    enumHours' hours a = mapMaybe (withHour a) (hours' a hours)
-    hours' _ = mapMaybe $ normalizeOrdinalIndex 23
-
-enumMinutes ::
-  (CalendarTimeConvertible a, Moment a) =>
-  [Int]
-  -> [a]
-  -> Schedule a
-enumMinutes ms as = return $ concatMap (enumMinutes' ms) as
-  where
-    enumMinutes' ms a = mapMaybe (withMinute a) (ms' a ms)
-    ms' _ = mapMaybe $ normalizeOrdinalIndex 59
-
-enumSeconds ::
-  (CalendarTimeConvertible a, Moment a) => 
-  [Int]
-  -> [a]
-  -> Schedule a
-enumSeconds secs as = return $ concatMap (enumSeconds' secs) as
-  where
-    enumSeconds' secs a = mapMaybe (withSecond a) (secs' a secs)
-    secs' _ = mapMaybe $ normalizeOrdinalIndex 60
-
-groupWith :: (Ord b) => (a -> b) -> [a] -> [[a]]
-groupWith f = groupBy (\a b -> f a == f b)
-
-nth :: [Int] -> [a] -> [a]
-nth ns as = map ((as !!) . pred) $ mapMaybe (normalizeOrdinalIndex (length as)) ns
-
-nth' ::
-  Ord b => 
-  (a -> b)
-  -> [Int]
-  -> [a]
-  -> Schedule a
-nth' f ns as = return $ concatMap (nth ns) $ groupWith f as
-
-nthYearDay ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthYearDay = nth' $ calendarYear . toCalendarTime
-
-nthMonth ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthMonth = nth' $ calendarYear . toCalendarTime
-
-nthDay ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthDay = nth' $ calendarMonth . toCalendarTime
-
-nthWeekDayOfWeek ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthWeekDayOfWeek ns as = do
-  sow <- asks startOfWeek
-  return $ 
-    concatMap (nth ns) $
-    concatMap (groupWith (weekNumber sow)) $
-    groupWith (calendarMonth . toCalendarTime) as 
-
-nthWeekDayOfMonth ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthWeekDayOfMonth = nth' $ calendarMonth . toCalendarTime
-
-nthWeekDay ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthWeekDay = nth' $ calendarYear . toCalendarTime
-
-nthHour ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthHour = nth' $ calendarDay . toCalendarTime
-
-nthMinute ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthMinute = nth' $ calendarHour . toCalendarTime
-
-nthSecond ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-nthSecond = nth' $ calendarMinute . toCalendarTime
-
-filterCalendarTime ::
-  (CalendarTimeConvertible a, Eq b) =>
-  (CalendarTime -> b)
-  -> [b]
-  -> [a]
-  -> Schedule a
-filterCalendarTime f xs as = return $ filter (flip elem xs . f . toCalendarTime) as
-
-filterMonths ::
-  CalendarTimeConvertible a =>
-  [Month]
-  -> [a]
-  -> Schedule a
-filterMonths = filterCalendarTime calendarMonth
-
-filterYearDays ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-filterYearDays = filterCalendarTime calendarYearDay
-
-filterDays ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-filterDays = filterCalendarTime calendarDay
-
-filterWeekDays ::
-  CalendarTimeConvertible a => 
-  [WeekDay]
-  -> [a]
-  -> Schedule a
-filterWeekDays = filterCalendarTime calendarWeekDay
-
-filterHours ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-filterHours = filterCalendarTime calendarHour
-
-filterMinutes ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-filterMinutes = filterCalendarTime calendarMinute
-
-filterSeconds ::
-  CalendarTimeConvertible a =>
-  [Int]
-  -> [a]
-  -> Schedule a
-filterSeconds = filterCalendarTime calendarSecond
+start :: (Ord a, Moment a) => InitialMoment a -> a -> [a]
+start im m0 = startWith im m0 return

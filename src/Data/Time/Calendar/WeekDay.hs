@@ -13,4 +13,4 @@ data WeekDay
     | Friday 
     | Saturday 
     | Sunday
-  deriving (Show, Eq, Ord, Enum, Bounded)
+  deriving (Read, Show, Eq, Ord, Enum, Bounded)

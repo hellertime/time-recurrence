@@ -16,20 +16,6 @@ module Data.Time.Moment.Moment
       -- * Initial Moment
     , InitialMoment (..)
 
-      -- * Default Initial Moment
-    , secondly
-    , minutely
-    , hourly
-    , daily
-    , weekly
-    , monthly
-    , yearly
-
-      -- * Adjust Interval
-    , by
-      -- * Adjust Start of Week
-    , withStartOfWeek
-
       -- * Period
     , Period (..)
     )
@@ -42,7 +28,7 @@ import Data.Time.CalendarTime hiding (withDay)
 import qualified Data.Time.CalendarTime as CT
 import Data.Time.Moment.Interval
 import Data.Time.Moment.Private
-import Data.Time.Moment.StartOfWeek
+import Data.Time.Moment.StartOfWeek ()
 
 oneSecond :: Integer
 oneSecond = 1
@@ -173,44 +159,6 @@ data InitialMoment a = InitialMoment
     , moment      :: a
     }
   deriving (Show)
-
-mkIM :: Moment a => Period -> InitialMoment a
-mkIM f = InitialMoment f (toInterval 1) (StartOfWeek Monday) epoch
-
--- | Default initial moments
-
-secondly :: Moment a => InitialMoment a
-secondly = mkIM Seconds
-
-minutely :: Moment a => InitialMoment a
-minutely = mkIM Minutes
-
-hourly :: Moment a => InitialMoment a
-hourly = mkIM Hours
-
-daily :: Moment a => InitialMoment a
-daily = mkIM Days
-
-weekly :: Moment a => InitialMoment a
-weekly = mkIM Weeks
-
-monthly :: Moment a => InitialMoment a
-monthly = mkIM Months
-
-yearly :: Moment a => InitialMoment a
-yearly = mkIM Years
-
--- | Typically called infix on an existing 'InitialMoment', like:
--- 
--- > monthly `by` 2
-by :: InitialMoment a -> Integer -> InitialMoment a
-by im i = im{interval=toInterval i}
-
--- | Typically called infix on an existing 'InitialMoment', like:
---
--- > weekly `withStartOfWeek` Tuesday
-withStartOfWeek :: InitialMoment a -> WeekDay -> InitialMoment a
-withStartOfWeek im sow = im{startOfWeek=toStartOfWeek sow}
 
 -- | @Period@ data type
 data Period

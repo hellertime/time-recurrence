@@ -4,7 +4,7 @@ module Data.Time.Moment
     )
   where
 
+import Data.Time.Moment.FutureMoments as ReExport
 import Data.Time.Moment.Interval as ReExport
 import Data.Time.Moment.Moment as ReExport
 import Data.Time.Moment.StartOfWeek as ReExport
-import Data.Time.Moment.UTC as ReExport

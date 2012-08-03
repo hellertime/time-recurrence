@@ -18,7 +18,7 @@ data Month
     | October
     | November
     | December
-  deriving (Show, Eq, Ord, Bounded)
+  deriving (Read, Show, Eq, Ord, Bounded)
 
 instance Enum Month where
   fromEnum January   = 1
