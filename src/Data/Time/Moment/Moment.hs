@@ -28,7 +28,7 @@ import Data.Time.CalendarTime hiding (withDay)
 import qualified Data.Time.CalendarTime as CT
 import Data.Time.Moment.Interval
 import Data.Time.Moment.Private
-import Data.Time.Moment.StartOfWeek
+import Data.Time.Moment.StartOfWeek ()
 
 oneSecond :: Integer
 oneSecond = 1

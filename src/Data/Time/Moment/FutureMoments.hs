@@ -6,6 +6,7 @@ module Data.Time.Moment.FutureMoments
     , iterateFutureMoments
 
     , enumMonths
+    , enumWeeks
     , enumDays
     , enumWeekDaysInWeek
     , enumWeekDaysInMonth
@@ -16,6 +17,7 @@ module Data.Time.Moment.FutureMoments
 
     , nthMonth
     , nthDay
+    , nthWeek
     , nthWeekDay
     , nthWeekDayOfWeek
     , nthWeekDayOfMonth
@@ -25,6 +27,7 @@ module Data.Time.Moment.FutureMoments
     , nthSecond
 
     , filterMonths
+    , filterWeeks
     , filterDays
     , filterWeekDays
     , filterYearDays
@@ -36,7 +39,7 @@ module Data.Time.Moment.FutureMoments
   where
 
 import Control.Monad.Reader
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.List
 import Data.List.Ordered as O
 import Data.Time.Calendar.Month
@@ -89,6 +92,17 @@ enumMonths ::
 enumMonths months as = return $ concatMap (enumMonths' months) as
   where
     enumMonths' months a = mapMaybe (withMonth a) months
+
+enumWeeks ::
+  (CalendarTimeConvertible a, Moment a) =>
+  [Int]
+  -> [a]
+  -> FutureMoments a
+enumWeeks weeks as = do
+  sow <- asks startOfWeek
+  return $ concatMap (enumWeeks' sow weeks) as
+ where
+   enumWeeks' sow weeks a = mapMaybe (withWeekNumber sow a) weeks
 
 enumDays ::
   (CalendarTimeConvertible a, Moment a) =>
@@ -189,6 +203,17 @@ nthDay ::
   -> FutureMoments a
 nthDay = nth' $ calendarMonth . toCalendarTime
 
+nthWeek ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> FutureMoments a
+nthWeek ns as = do
+  sow <- asks startOfWeek
+  return $
+    concatMap (nth ns) $
+    groupWith (weekNumber sow . toCalendarTime) as
+
 nthWeekDayOfWeek ::
   CalendarTimeConvertible a =>
   [Int]
@@ -236,13 +261,21 @@ nthSecond ::
   -> FutureMoments a
 nthSecond = nth' $ calendarMinute . toCalendarTime
 
+filterCalendarTime' ::
+  (CalendarTimeConvertible a, Eq b) =>
+  (CalendarTime -> b)
+  -> [b]
+  -> [a]
+  -> [a]
+filterCalendarTime' f xs as = filter (flip elem xs . f . toCalendarTime) as
+
 filterCalendarTime ::
   (CalendarTimeConvertible a, Eq b) =>
   (CalendarTime -> b)
   -> [b]
   -> [a]
   -> FutureMoments a
-filterCalendarTime f xs as = return $ filter (flip elem xs . f . toCalendarTime) as
+filterCalendarTime f xs as = return $ filterCalendarTime' f xs as
 
 filterMonths ::
   CalendarTimeConvertible a =>
@@ -264,6 +297,15 @@ filterDays ::
   -> [a]
   -> FutureMoments a
 filterDays = filterCalendarTime calendarDay
+
+filterWeeks ::
+  CalendarTimeConvertible a =>
+  [Int]
+  -> [a]
+  -> FutureMoments a
+filterWeeks wks as = do
+  sow <- asks startOfWeek
+  return $ filterCalendarTime' (fromMaybe 0 . weekNumber sow) (filter (>0) wks) as
 
 filterWeekDays ::
   CalendarTimeConvertible a =>

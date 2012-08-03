@@ -134,25 +134,32 @@ eval (Enumerate x) = case (fromEPF x) of
     (Seconds ss)         -> enumSeconds ss
     (Minutes mm)         -> enumMinutes mm
     (Hours hh)           -> enumHours hh
+    (WeekDays _)         -> undefined
     (WeekDaysInWeek ww)  -> enumWeekDaysInWeek ww
     (WeekDaysInMonth ww) -> enumWeekDaysInMonth ww
     (Days dd)            -> enumDays dd
+    (Weeks wk)           -> enumWeeks wk
     (Months mm)          -> enumMonths mm
     (YearDays yy)        -> enumYearDays yy
 eval (Filter x) = case (fromFPF x) of
-    (Seconds ss)  -> filterSeconds ss
-    (Minutes mm)  -> filterMinutes mm
-    (Hours hh)    -> filterHours hh
-    (WeekDays ww) -> filterWeekDays ww
-    (Days dd)     -> filterDays dd
-    (Months mm)   -> filterMonths mm
-    (YearDays yy) -> filterYearDays yy
+    (Seconds ss)        -> filterSeconds ss
+    (Minutes mm)        -> filterMinutes mm
+    (Hours hh)          -> filterHours hh
+    (WeekDays ww)       -> filterWeekDays ww
+    (WeekDaysInWeek _)  -> undefined
+    (WeekDaysInMonth _) -> undefined
+    (Days dd)           -> filterDays dd
+    (Weeks wk)          -> filterWeeks wk
+    (Months mm)         -> filterMonths mm
+    (YearDays yy)       -> filterYearDays yy
 eval (Select x) = case (fromSPF x) of
     (Seconds ss)         -> nthSecond ss
     (Minutes mm)         -> nthMinute mm
     (Hours hh)           -> nthHour hh
+    (WeekDays ww)        -> nthWeekDay ww
     (WeekDaysInWeek ww)  -> nthWeekDayOfWeek ww
     (WeekDaysInMonth ww) -> nthWeekDayOfMonth ww
+    (Weeks wk)           -> nthWeek wk
     (Days dd)            -> nthDay dd
     (Months mm)          -> nthDay mm
     (YearDays yy)        -> nthYearDay yy
