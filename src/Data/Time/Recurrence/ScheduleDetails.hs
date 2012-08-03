@@ -1,8 +1,8 @@
-{-# LANGUAGE GADTs, EmptyDataDecls, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, RankNTypes, StandaloneDeriving, UndecidableInstances #-}
+{-# LANGUAGE GADTs, EmptyDataDecls, FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses, RankNTypes, StandaloneDeriving, TypeSynonymInstances,UndecidableInstances #-}
 module Data.Time.Recurrence.ScheduleDetails
     (
       -- * ScheduleDetails
-      ScheduleDetails (..)
+      ScheduleDetails
 
     , eval
 
@@ -27,19 +27,16 @@ import Data.Time.CalendarTime
 import Data.Time.Moment hiding (Period(..))
 import Data.Time.Recurrence.AndThen
 
-infixr 5 :&, :|, :!!
-infixr 0 :>, :>>, :>>>
-
 data ScheduleDetails a where
-    Enumerate :: EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter
-    Filter    :: FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
-    Select    :: SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
-    (:&)      :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter
-    (:|)      :: ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
-    (:!!)     :: ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
-    (:>)      :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
-    (:>>)     :: ScheduleDetails FilterablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
-    (:>>>)    :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
+    Enumerate  :: EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter
+    Filter     :: FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
+    Select     :: SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
+    EPFCons    :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails EnumerablePeriodFilter
+    FPFCons    :: ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
+    SPFCons    :: ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
+    EPFConsFPF :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails FilterablePeriodFilter -> ScheduleDetails FilterablePeriodFilter
+    FPFConsSPF :: ScheduleDetails FilterablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
+    EPFConsSPF :: ScheduleDetails EnumerablePeriodFilter -> ScheduleDetails SelectablePeriodFilter -> ScheduleDetails SelectablePeriodFilter
 
 deriving instance Show (ScheduleDetails a)
 
@@ -56,46 +53,46 @@ type BareEPF = EnumerablePeriodFilter
 type WrapEPF = ScheduleDetails EnumerablePeriodFilter
 
 instance AndThen BareEPF BareEPF WrapEPF where
-  (===>) x y = (Enumerate x) :& (Enumerate y)
+  (>==>) x y = (Enumerate x) `EPFCons` (Enumerate y)
 
 instance AndThen BareEPF WrapEPF WrapEPF where
-  (===>) x y = (Enumerate x) :& y
+  (>==>) x y = (Enumerate x) `EPFCons` y
 
 instance AndThen WrapEPF WrapEPF WrapEPF where
-  (===>) x y = x :& y
+  (>==>) x y = x `EPFCons` y
 
 type BareFPF = FilterablePeriodFilter
 type WrapFPF = ScheduleDetails FilterablePeriodFilter
 
 instance AndThen BareFPF BareFPF WrapFPF where
-  (===>) x y = (Filter x) :| (Filter y)
+  (>==>) x y = (Filter x) `FPFCons` (Filter y)
 
 instance AndThen BareFPF WrapFPF WrapFPF where
-  (===>) x y = (Filter x) :| y
+  (>==>) x y = (Filter x) `FPFCons` y
 
 instance AndThen WrapFPF WrapFPF WrapFPF where
-  (===>) x y = x :| y
+  (>==>) x y = x `FPFCons` y
 
 type BareSPF = SelectablePeriodFilter
 type WrapSPF = ScheduleDetails SelectablePeriodFilter
 
 instance AndThen BareSPF BareSPF WrapSPF where
-  (===>) x y = (Select x) :!! (Select y)
+  (>==>) x y = (Select x) `SPFCons` (Select y)
 
 instance AndThen BareSPF WrapSPF WrapSPF where
-  (===>) x y = (Select x) :!! y
+  (>==>) x y = (Select x) `SPFCons` y
 
 instance AndThen WrapSPF WrapSPF WrapSPF where
-  (===>) x y = x :!! y
+  (>==>) x y = x `SPFCons` y
 
 instance AndThen WrapEPF WrapFPF WrapFPF where
-  (===>) x y = x :> y
+  (>==>) x y = x `EPFConsFPF` y
 
 instance AndThen WrapFPF WrapSPF WrapSPF where
-  (===>) x y = x :>> y
+  (>==>) x y = x `FPFConsSPF` y
 
 instance AndThen WrapEPF WrapSPF WrapSPF where
-  (===>) x y = x :>>> y
+  (>==>) x y = x `EPFConsSPF` y
 
 data PeriodFilter m e f
     = Seconds [Int]
@@ -163,11 +160,11 @@ eval (Select x) = case (fromSPF x) of
     (Days dd)            -> nthDay dd
     (Months mm)          -> nthDay mm
     (YearDays yy)        -> nthYearDay yy
-eval ((:&) x y)   = eval x >=> eval y
-eval ((:|) x y)   = eval x >=> eval y
-eval ((:!!) x y)  = eval x >=> eval y
-eval ((:>) x y)   = eval x >=> eval y
-eval ((:>>) x y)  = eval x >=> eval y
-eval ((:>>>) x y) = eval x >=> eval y
+eval (EPFCons x y)    = eval x >=> eval y
+eval (FPFCons x y)    = eval x >=> eval y
+eval (SPFCons x y)    = eval x >=> eval y
+eval (EPFConsFPF x y) = eval x >=> eval y
+eval (FPFConsSPF x y) = eval x >=> eval y
+eval (EPFConsSPF x y) = eval x >=> eval y
 
 

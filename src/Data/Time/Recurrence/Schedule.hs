@@ -25,6 +25,7 @@ module Data.Time.Recurrence.Schedule
     , hourly
     , daily
     , weekly
+    , monthly
     , yearly
 
       -- * evaluate a Schedule into a function
@@ -102,7 +103,7 @@ recur :: Freq -> Schedule Freq
 recur = Recur
 
 instance AndThen (Schedule Freq) (ScheduleDetails b) (Schedule (ScheduleDetails b)) where
-  (===>) x y = And x y
+  (>==>) x y = And x y
 
 eval :: (CalendarTimeConvertible a, Ord a, Moment a) => Schedule b -> (a -> [a])
 eval (And recur details) = flip (startWith $ mkIM recur) $ D.eval details

@@ -69,13 +69,15 @@ Library
      Data.Time.Calendar.WeekDay,
      Data.Time.CalendarTime,
      Data.Time.Moment,
-     Data.Time.Moment.Interval,
-     Data.Time.Moment.StartOfWeek,
      Data.Time.Recurrence,
+     Data.Time.Recurrence.AndThen
      Data.Time.Recurrence.Schedule
+     Data.Time.Recurrence.ScheduleDetails
   Other-modules:
      Data.Time.CalendarTime.CalendarTime,
-     Data.Time.Moment.Moment,
+     Data.Time.Moment.FutureMoments
+     Data.Time.Moment.Interval,
+     Data.Time.Moment.StartOfWeek,
      Data.Time.Moment.Private,
      Data.Time.Moment.UTC
   
