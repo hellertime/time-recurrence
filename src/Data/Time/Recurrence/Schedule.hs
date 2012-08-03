@@ -37,7 +37,7 @@ module Data.Time.Recurrence.Schedule
   where
 
 import Data.List.Ordered as O
-import Data.Time.Calendar.Month
+import Data.Time.Calendar.Month ()
 import Data.Time.Calendar.WeekDay
 import Data.Time.CalendarTime
 import Data.Time.Moment hiding (interval, startOfWeek, Period(..))
