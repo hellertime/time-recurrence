@@ -75,6 +75,7 @@ Library
      Data.Time.Recurrence.ScheduleDetails
   Other-modules:
      Data.Time.CalendarTime.CalendarTime,
+     Data.Time.Moment.Moment,
      Data.Time.Moment.FutureMoments
      Data.Time.Moment.Interval,
      Data.Time.Moment.StartOfWeek,
