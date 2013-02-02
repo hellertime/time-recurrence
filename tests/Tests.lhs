@@ -57,6 +57,14 @@ to use.
 >            (until date4 $ starting date3 $ recur yearly >==> enum (Months [January]) >==> enum (WeekDaysInMonth [Monday .. Sunday]))
 >            (until date4 $ starting date3 $ recur daily >==> filter (Months [January]))
 >        ]
+>      , testGroup "Tests to ensure Github Issue-1 is fixed" $ zipWith (testCase . show) [1::Int ..]
+>        [ getCurrentTime >>= \now ->
+>          assertEqual ("Generate 3 dates on the 0 and 30 minute marks")
+>            3 (length $ take 3 . starting now $ recur daily >==> enum (Minutes [0,30]))
+>        , getCurrentTime >>= \now ->
+>          assertEqual ("Generate a single date on the 0 minute mark")
+>           1 (length $ take 1 . starting now $ recur daily >==> enum (Minutes [0]))
+>        ]
 >      ]
 
 This is the assertion function for testing the number of days between moments.
