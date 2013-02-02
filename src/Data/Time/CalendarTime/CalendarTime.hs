@@ -23,14 +23,14 @@ import Data.Time.Moment.StartOfWeek
 -- | A representation of calendar time separated into year, month, day, and so on.
 data CalendarTime = CalendarTime 
     {
-      calendarSecond   :: Int
-    , calendarMinute   :: Int
-    , calendarHour     :: Int
-    , calendarDay      :: Int
-    , calendarMonth    :: Month
-    , calendarYear     :: Integer
-    , calendarWeekDay  :: WeekDay
-    , calendarYearDay  :: Int
+      calendarSecond   :: Int           -- 0 .. 61
+    , calendarMinute   :: Int           -- 0 .. 59
+    , calendarHour     :: Int           -- 0 .. 23
+    , calendarDay      :: Int           -- 1 .. 31
+    , calendarMonth    :: Month         -- January .. December
+    , calendarYear     :: Integer       -- 0 ..
+    , calendarWeekDay  :: WeekDay       -- Sunday .. Saturday
+    , calendarYearDay  :: Int           -- 1 .. 366
     , calendarTimeZone :: TimeZone
 } deriving (Eq,Ord,Show)
 
@@ -78,7 +78,7 @@ dayInfo day = let
   
 
 instance CalendarTimeConvertible UTCTime where
-  toCalendarTime (UTCTime utcDay utcTime) = CalendarTime (fromEnum ss) mm hh d (toEnum m) y weekDay yearDay utc
+  toCalendarTime (UTCTime utcDay utcTime) = CalendarTime (truncate ss) mm hh d (toEnum m) y weekDay yearDay utc
     where
       (TimeOfDay hh mm ss) = timeToTimeOfDay utcTime
       (y, m, d, weekDay, yearDay) = dayInfo utcDay
