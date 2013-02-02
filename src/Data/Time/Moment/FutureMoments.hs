@@ -61,17 +61,16 @@ iterateFutureMoments im sch = runReader (iterateInitialMoment >>= sch) im
       im <- ask
       return $ iterate (next (interval im) (period im)) (moment im)
 
--- | Normalize an bounded ordinal index
---   Pass an upper-bound 'ub' and an index 'idx'
---   Converts 'idx' < 0 into valid 'idx' > 0 or
---   Nothing
-normalizeOrdinalIndex :: Int -> Int -> Maybe Int
-normalizeOrdinalIndex _ 0 = Nothing
-normalizeOrdinalIndex ub idx =
-  if abs idx > ub
+-- | Normalize an bounded ordinal index between a lower and upper bound
+--   Negative indexes are allowed and index from the upper bound to the lower
+--   Any other value returns Nothing
+normalizeOrdinalIndex :: Int -> Int -> Int -> Maybe Int
+normalizeOrdinalIndex lb ub idx =
+  if abx < lb || abx > ub
     then Nothing
     else Just $ (idx + ub') `mod` ub'
   where
+    abx = abs idx
     ub' = ub + 1
 
 enumYearDays ::
@@ -82,7 +81,7 @@ enumYearDays ::
 enumYearDays days as = return $ concatMap (enumYearDays' days) as
   where
     enumYearDays' days a = mapMaybe (withYearDay a) (days' a days)
-    days' a = mapMaybe $ normalizeOrdinalIndex (daysInYear a)
+    days' a = mapMaybe $ normalizeOrdinalIndex 1 (daysInYear a)
 
 enumMonths :: 
   (CalendarTimeConvertible a, Moment a) => 
@@ -112,7 +111,7 @@ enumDays ::
 enumDays days as = return $ concatMap (enumDays' days) as
   where
     enumDays' days a = mapMaybe (withDay a) (days' a days)
-    days' a = mapMaybe $ normalizeOrdinalIndex (lastDayOfMonth a)
+    days' a = mapMaybe $ normalizeOrdinalIndex 1 (lastDayOfMonth a)
 
 enumWeekDaysInWeek ::
   (CalendarTimeConvertible a, Moment a) =>
@@ -146,7 +145,7 @@ enumHours ::
 enumHours hours as = return $ concatMap (enumHours' hours) as
   where
     enumHours' hours a = mapMaybe (withHour a) (hours' a hours)
-    hours' _ = mapMaybe $ normalizeOrdinalIndex 23
+    hours' _ = mapMaybe $ normalizeOrdinalIndex 0 23
 
 enumMinutes ::
   (CalendarTimeConvertible a, Moment a) =>
@@ -156,7 +155,7 @@ enumMinutes ::
 enumMinutes ms as = return $ concatMap (enumMinutes' ms) as
   where
     enumMinutes' ms a = mapMaybe (withMinute a) (ms' a ms)
-    ms' _ = mapMaybe $ normalizeOrdinalIndex 59
+    ms' _ = mapMaybe $ normalizeOrdinalIndex 0 59
 
 enumSeconds ::
   (CalendarTimeConvertible a, Moment a) =>
@@ -166,13 +165,13 @@ enumSeconds ::
 enumSeconds secs as = return $ concatMap (enumSeconds' secs) as
   where
     enumSeconds' secs a = mapMaybe (withSecond a) (secs' a secs)
-    secs' _ = mapMaybe $ normalizeOrdinalIndex 60
+    secs' _ = mapMaybe $ normalizeOrdinalIndex 0 61
 
 groupWith :: (Ord b) => (a -> b) -> [a] -> [[a]]
 groupWith f = groupBy (\a b -> f a == f b)
 
 nth :: [Int] -> [a] -> [a]
-nth ns as = map ((as !!) . pred) $ mapMaybe (normalizeOrdinalIndex (length as)) ns
+nth ns as = map ((as !!) . pred) $ mapMaybe (normalizeOrdinalIndex 0 (length as)) ns
 
 nth' ::
   (Ord b) =>
