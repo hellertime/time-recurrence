@@ -86,7 +86,7 @@ Library
   Build-depends:       base >= 4 && < 5,
                        time >= 1.4 && < 1.5,
                        data-ordlist >= 0.4.5,
-                       mtl >= 2.0 && < 2.2
+                       mtl >= 2.0 && < 2.3
   
   Default-Language:    Haskell98
   -- Modules not exported by this package.
