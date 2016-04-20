@@ -13,7 +13,6 @@ The examples are actually all in the America/New_York time zone, but since
 a local time instance has not been created yet, all the dates are converted
 into UTC.
 
-> import System.Locale (defaultTimeLocale, rfc822DateFormat)
 > import Data.Time
 > import Data.Maybe (fromJust)
 
@@ -25,9 +24,9 @@ to use.
 
 > date1, date2, date3, date4 :: UTCTime
 > parse822Time :: String -> UTCTime
-> parse822Time = zonedTimeToUTC 
->              . fromJust 
->              . parseTime defaultTimeLocale rfc822DateFormat
+> parse822Time = zonedTimeToUTC
+>              . fromJust
+>              . parseTimeM True defaultTimeLocale rfc822DateFormat
 > date1 = parse822Time "Tue, 02 Sep 1997 09:00:00 -0400"
 > date2 = parse822Time "Wed, 24 Dec 1997 00:00:00 -0400"
 > date3 = parse822Time "Thu, 01 Jan 1998 09:00:00 -0400"
@@ -40,9 +39,9 @@ to use.
 > until m = takeWhile (<= m)
 
 > tests :: [Test]
-> tests = 
+> tests =
 >      [ testGroup "RFC5445 Examples" $ zipWith (testCase . show) [1::Int ..]
->        [ assertEqual ("Test Daily from "++ show date1 ++". 10 Occurrences") 
+>        [ assertEqual ("Test Daily from "++ show date1 ++". 10 Occurrences")
 >            (take 10 $ starting date1 $ recur daily)
 >            (take 10 $ starting date1 $ recur monthly >==> enum (Days [2 .. 11]))
 >        , assertEqual ("Test Daily from "++ show date1 ++". Until "++ show date2)
@@ -68,7 +67,7 @@ to use.
 >      ]
 
 This is the assertion function for testing the number of days between moments.
-It will be used in a couple of tests, and requires at least two moments to 
+It will be used in a couple of tests, and requires at least two moments to
 operate correctly.
 
 > dayDist :: [UTCTime] -> [Integer]
