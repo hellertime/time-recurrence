@@ -84,9 +84,10 @@ Library
 
   -- Packages needed in order to build this package.
   Build-depends:       base >= 4 && < 5,
-                       time >= 1.4 && < 2,
+                       time >= 1.4 && < 1.6,
                        data-ordlist >= 0.4.5,
-                       mtl >= 2.0 && < 2.3
+                       mtl >= 2.0 && < 2.3,
+                       time-locale-compat
 
   Default-Language:    Haskell98
   -- Modules not exported by this package.
@@ -101,13 +102,14 @@ Test-Suite test-time-recurrence
   main-is:              Tests.lhs
   ghc-options:          -Wall -fno-warn-name-shadowing -fno-warn-orphans
   build-depends:        base >= 4 && < 5,
-                        time >= 1.4 && < 2,
+                        time >= 1.4 && < 1.6,
                         data-ordlist >= 0.4.5,
                         mtl >= 2.0 && < 2.3,
                         test-framework >= 0.8,
                         test-framework-hunit >= 0.3.0,
                         HUnit >= 1.2 && < 1.4,
-                        old-locale >= 1.0 && < 1.1
+                        old-locale >= 1.0 && < 1.1,
+                        time-locale-compat
   other-modules:
     Data.Time.Recurrence
   default-language:     Haskell98

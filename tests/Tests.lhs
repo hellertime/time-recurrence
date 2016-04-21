@@ -1,3 +1,5 @@
+> {-# LANGUAGE CPP #-}
+
 HUnut test suite of example recurrences lifted from RFC 5545 section 3.8.5.3
 
 > module Main where
@@ -13,11 +15,23 @@ The examples are actually all in the America/New_York time zone, but since
 a local time instance has not been created yet, all the dates are converted
 into UTC.
 
+#if MIN_VERSION_time(1,5,0)
 > import Data.Time
-> import Data.Maybe (fromJust)
+#else
+> import Data.Time
+> import System.Locale (TimeLocale, defaultTimeLocale, rfc822DateFormat)
+#endif
 
+> import Data.Maybe (fromJust)
 > import Prelude hiding (until, filter)
 > import Data.Time.Recurrence
+
+> timeParse :: ParseTime t => TimeLocale -> String -> String -> Maybe t
+#if MIN_VERSION_time(1,5,0)
+> timeParse = parseTimeM True
+#else
+> timeParse = parseTime
+#endif
 
 We are certain of the validity of the dates used, and so fromJust is safe
 to use.
@@ -26,7 +40,7 @@ to use.
 > parse822Time :: String -> UTCTime
 > parse822Time = zonedTimeToUTC
 >              . fromJust
->              . parseTimeM True defaultTimeLocale rfc822DateFormat
+>              . timeParse defaultTimeLocale rfc822DateFormat
 > date1 = parse822Time "Tue, 02 Sep 1997 09:00:00 -0400"
 > date2 = parse822Time "Wed, 24 Dec 1997 00:00:00 -0400"
 > date3 = parse822Time "Thu, 01 Jan 1998 09:00:00 -0400"
