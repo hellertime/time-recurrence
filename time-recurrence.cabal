@@ -86,8 +86,7 @@ Library
   Build-depends:       base >= 4 && < 5,
                        time >= 1.4 && < 1.6,
                        data-ordlist >= 0.4.5,
-                       mtl >= 2.0 && < 2.3,
-                       time-locale-compat
+                       mtl >= 2.0 && < 2.3
 
   Default-Language:    Haskell98
   -- Modules not exported by this package.
@@ -108,8 +107,7 @@ Test-Suite test-time-recurrence
                         test-framework >= 0.8,
                         test-framework-hunit >= 0.3.0,
                         HUnit >= 1.2 && < 1.4,
-                        old-locale >= 1.0 && < 1.1,
-                        time-locale-compat
+                        old-locale >= 1.0 && < 1.1
   other-modules:
     Data.Time.Recurrence
   default-language:     Haskell98
