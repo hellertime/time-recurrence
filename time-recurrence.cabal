@@ -84,7 +84,7 @@ Library
 
   -- Packages needed in order to build this package.
   Build-depends:       base >= 4 && < 5,
-                       time >= 1.4 && < 1.9,
+                       time >= 1.4 && < 1.10,
                        data-ordlist >= 0.4.5,
                        mtl >= 2.0 && < 2.3
 
@@ -101,7 +101,7 @@ Test-Suite test-time-recurrence
   main-is:              Tests.lhs
   ghc-options:          -Wall -fno-warn-name-shadowing -fno-warn-orphans
   build-depends:        base >= 4 && < 5,
-                        time >= 1.4 && < 1.9,
+                        time >= 1.4 && < 1.10,
                         data-ordlist >= 0.4.5,
                         mtl >= 2.0 && < 2.3,
                         test-framework >= 0.8,
