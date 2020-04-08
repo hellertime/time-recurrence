@@ -14,7 +14,7 @@ module Data.Time.CalendarTime.CalendarTime
     ) 
   where
 
-import Data.Time
+import Data.Time hiding (calendarDay, calendarMonth, calendarYear)
 import Data.Time.Calendar.OrdinalDate
 import Data.Time.Calendar.Month
 import Data.Time.Calendar.WeekDay
