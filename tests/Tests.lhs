@@ -16,7 +16,7 @@ a local time instance has not been created yet, all the dates are converted
 into UTC.
 
 #if MIN_VERSION_time(1,5,0)
-> import Data.Time
+> import Data.Time hiding (DayOfWeek(..))
 #else
 > import Data.Time
 > import System.Locale (TimeLocale, defaultTimeLocale, rfc822DateFormat)
